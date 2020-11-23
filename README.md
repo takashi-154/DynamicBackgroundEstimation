@@ -9,7 +9,7 @@
 ![処理前](https://github.com/takashi-154/DynamicBackgroundExtraction/blob/main/sample/sample2.jpg)
 
 ポイント指定画面
-![ポイント指定画面](https://github.com/takashi-154/DynamicBackgroundExtraction/blob/main/sample/Figure_1.png)
+![ポイント指定画面](https://github.com/takashi-154/DynamicBackgroundExtraction/blob/main/sample/Figure_1.jpg)
 
 処理後（レベル補正済み）
 ![処理後](https://github.com/takashi-154/DynamicBackgroundExtraction/blob/main/sample/sample1.jpg)
@@ -44,7 +44,7 @@ jupyter notebookで動かすことを基本とします。
 
 # Note
 
-一応ベータ版。必要に応じて更新・拡張。jupyter notebookから切り離して完全にGUI化したい。
+一応ベータ版。今後の方針は**Future plan**に。
 
 # Future plan
 
