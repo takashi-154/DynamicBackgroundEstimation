@@ -6,11 +6,13 @@
 # DEMO
 
 処理前（レベル補正済み）
+![処理前](https://github.com/takashi-154/DynamicBackgroundExtraction/blob/main/sample/sample2.jpg)
 
 ポイント指定画面
+![ポイント指定画面](https://github.com/takashi-154/DynamicBackgroundExtraction/blob/main/sample/Figure_1.png)
 
 処理後（レベル補正済み）
-
+![処理後](https://github.com/takashi-154/DynamicBackgroundExtraction/blob/main/sample/sample1.jpg)
 
 # Features
 
@@ -46,7 +48,7 @@ jupyter notebookで動かすことを基本とする
 # Author
 
 * takashi-154
-* Twitter: @Mazic_tell_Arts
+* Twitter: [@Mazic_tell_Arts](https://twitter.com/Mazic_tell_Arts)
 
 # License
 
