@@ -1,3 +1,7 @@
 /.ipynb_checkpoints
 /.spyproject
 /__pycache__
+/functions/__pycache__
+/dist
+/build
+dynamic_background_estimation.spec
