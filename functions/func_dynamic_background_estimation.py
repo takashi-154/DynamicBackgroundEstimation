@@ -13,11 +13,35 @@ import astropy.io.fits as iofits
 from scipy import optimize
 
 class DynamicBackgroundEstimation:
+    """
+    メインの処理関数の集まり。
+
+    """
     
     def __init__(self):
+        """
         
+        Parameters
+        ----------
+        name : str
+            プログラム名。
+        """
         self.name = 'DynamicBackgroundEstimation'
         
+        
+    def initialize_image(self):
+        """
+        処理対象の画像の初期化。
+    
+        Returns
+        -------
+        img_array : np.ndarray
+            画像のnumpy配列（float,32bit）
+        """
+        img_array = np.full((200,300,3), np.nan, dtype=np.float32)
+        print('Fin initializing image.')
+        return(img_array)
+    
         
     def read_image(self, name:str):
         """
@@ -82,7 +106,22 @@ class DynamicBackgroundEstimation:
         print('Fin saving image.')
         
         
-    def read_list(self, name:str="", is_new:bool=False):
+    def initialize_list(self):
+        """
+        指定ポイントの一覧を作成する。
+    
+        Returns
+        -------
+        target : np.ndarray
+            指定ポイントのnumpy配列（uint,16bit）
+        """
+        print('making new list...')
+        target = np.empty((0,2)).astype(np.uint16)
+        print('Fin reading list.')
+        return(target)
+        
+    
+    def read_list(self, name:str):
         """
         指定ポイントの一覧を読み込む。
     
@@ -90,20 +129,14 @@ class DynamicBackgroundEstimation:
         ----------
         name : str
             指定ポイントのＸＹ座標を格納したファイルのファイルパス名（.npy形式）
-        is_new : bool, default False
-            ファイルの存在に関わらず新しい指定ポイントファイルを作成するか（デフォルトは[False]）
     
         Returns
         -------
         target : np.ndarray
             指定ポイントのnumpy配列（uint,16bit）
         """
-        if os.path.isfile(name) and not is_new:
-            print('reading old list...')
-            target = np.load(name)
-        else:
-            print('making new list...')
-            target = np.empty((0,2)).astype(np.uint16)
+        print('reading old list...')
+        target = np.load(name)
         print('Fin reading list.')
         return(target)
         
@@ -151,17 +184,18 @@ class DynamicBackgroundEstimation:
             PointSetterクラス用返り値
         img_comp : 
             PointSetterクラス用返り値
-        box_comp : 
+        img_show : 
+            PointSetterクラス用返り値
+        box_show : 
+            PointSetterクラス用返り値
+        med_show : 
             PointSetterクラス用返り値
         box_window : 
-            PointSetterクラス用返り値
-        box_median : 
             PointSetterクラス用返り値
         """
         img_comp = (img_array/np.max(img_array)*255).astype('uint8')
         if target.size == 0:
-            box_comp_array = img_comp[int(img_comp.shape[1]/2)-box_window:int(img_comp.shape[1]/2)+box_window,
-                                      int(img_comp.shape[0]/2)-box_window:int(img_comp.shape[0]/2)+box_window]
+            box_comp_array = np.full((box_window*2, box_window*2, img_comp.shape[2]), np.nan, dtype='uint8')
         else:
             box_comp_array = img_comp[target[-1,1]-box_window:target[-1,1]+box_window,
                                       target[-1,0]-box_window:target[-1,0]+box_window]
@@ -173,22 +207,22 @@ class DynamicBackgroundEstimation:
         
         ax1 = fig.add_subplot(3,3,(1,6))
         ax1.set_title('left-click: add, right-click: remove')
-        ax1.imshow(img_comp)
+        img_show = ax1.imshow(img_comp)
         point, = ax1.plot(target[...,0].tolist(), target[...,1].tolist(), marker="o", linestyle='None', color="#FFFF00")
         point.set_picker(True)
         point.set_pickradius(10)
         
         ax2 = fig.add_subplot(3,3,7)
         ax2.set_title('point window box')
-        box_comp = ax2.imshow(box_comp_array,interpolation='nearest',vmin=0,vmax=255,cmap='inferno')
+        box_show = ax2.imshow(box_comp_array,interpolation='nearest',vmin=0,vmax=255,cmap='inferno')
         
         ax3 = fig.add_subplot(3,3,9)
         ax3.set_title('box median')
         ax3.axis('off')
-        box_median = ax3.imshow(np.median(box_comp_array, axis=(0,1), keepdims=True).astype('uint8'),
-                                interpolation='nearest',vmin=0,vmax=255,cmap='inferno')
+        med_show = ax3.imshow(np.nanmedian(box_comp_array, axis=(0,1), keepdims=True).astype('uint8'),
+                              interpolation='nearest',vmin=0,vmax=255,cmap='inferno')
         
-        return(fig, point, img_comp, box_comp, box_window, box_median)
+        return(fig, point, img_comp, img_show, box_show, med_show, box_window)
         
     
     def postprocess_plot_point(self, pointlist):
@@ -354,12 +388,14 @@ class PointSetter:
         指定ポイントの配列。
     img : 
         画像。
-    box : 
-        window画像。
-    side : 
+    img_show : 
+        matplotlib_画像。
+    box_show : 
+        matplotlib_window画像。
+    med_show : 
+        matplotlib_window画像のmedian。
+    window : 
         windowサイズ。
-    med : 
-        window画像のmedian。
     xs : 
         指定ポイントのX軸
     ys : 
@@ -370,7 +406,7 @@ class PointSetter:
         指定ポイント選択・削除の関数呼び出し
     """
     
-    def __init__(self, line, img, box, side, med):
+    def __init__(self, line, img, img_show, box_show, med_show, window):
         """
         
         Parameters
@@ -379,23 +415,87 @@ class PointSetter:
             指定ポイントの配列。
         img : 
             画像。
-        box : 
+        img_show : 
+            画像。
+        box_show : 
             window画像。
-        side : 
-            windowサイズ。
-        med : 
+        med_show : 
             window画像のmedian。
+        window : 
+            windowサイズ。
         """
         self.line = line
         self.img = img
-        self.box = box
-        self.side = side
-        self.med = med
+        self.img_show = img_show
+        self.box_show = box_show
+        self.med_show = med_show
+        self.window = window
         self.xs = list(line.get_xdata())
         self.ys = list(line.get_ydata())
         self.cidadd = line.figure.canvas.mpl_connect('button_press_event', self.on_add)
         self.cidhandle = line.figure.canvas.mpl_connect('pick_event', self.on_handle)
 
+
+    def set_image(self, img_array):
+        """
+        画像を更新する。
+        
+        Parameters
+        ----------
+        img_array : np.ndarray
+            画像のnumpy配列（float,32bit）
+        """
+        img_comp = (img_array/np.max(img_array)*255).astype('uint8')
+        self.img = img_comp
+        self.img_show.set_data(img_comp)
+        self.img_show.set_extent((0, img_comp.shape[1], img_comp.shape[0], 0))
+        new_box = np.full((self.window*2, self.window*2, img_comp.shape[2]), np.nan, dtype='uint8')
+        new_box = np.nanmean(new_box, axis=2)
+        new_med = np.nanmedian(new_box, axis=(0,1), keepdims=True).astype('uint8')
+        self.box_show.set_data(new_box)
+        self.med_show.set_data(new_med)
+        self.line.figure.canvas.draw()
+        
+
+    def set_target(self, target):
+        """
+        指定ポイントを更新する。
+    
+        Parameters
+        ----------
+        target : np.ndarray
+            指定ポイントのXY座標を格納したnumpy配列
+        """
+        self.xs = target[...,0].tolist()
+        self.ys = target[...,1].tolist()
+        self.line.set_data(self.xs, self.ys)
+        self.line.figure.canvas.draw()
+        
+        
+    def set_window(self, new_window):
+        """
+        指定ポイントを更新する。
+    
+        Parameters
+        ----------
+        new_window : int
+            新しいウインドウサイズ
+        """
+        self.window = new_window
+        new_box = np.full((self.window*2, self.window*2, self.img.shape[2]), np.nan, dtype='uint8')
+        if len(self.xs) > 0: 
+            _x = np.arange(int(self.xs[-1])-self.window, int(self.xs[-1])+self.window)
+            _x = _x[(0 <= _x) & (_x < self.img.shape[1])]
+            _y = np.arange(int(self.ys[-1])-self.window, int(self.ys[-1])+self.window)
+            _y = _y[(0 <= _y) & (_y < self.img.shape[0])]
+            new_box[np.ix_(_y-np.min(_y),_x-np.min(_x))] = self.img[np.ix_(_y,_x)]
+        new_box = np.nanmean(new_box, axis=2)
+        new_med = np.nanmedian(new_box, axis=(0,1), keepdims=True).astype('uint8')
+        self.box_show.set_data(new_box)
+        self.box_show.set_extent((0, new_box.shape[1], new_box.shape[0], 0))
+        self.med_show.set_data(new_med)
+        self.line.figure.canvas.draw()
+        
 
     def on_add(self, event):
         """
@@ -413,13 +513,16 @@ class PointSetter:
             self.xs.append(x)
             self.ys.append(y)
             self.line.set_data(self.xs, self.ys)
-            window = np.array([int(x)-self.side, int(x)+self.side, int(y)-self.side, int(y)+self.side])
-            window[window<0] = 0
-            new_box = self.img[window[2]:window[3], window[0]:window[1]]
-            new_box = np.mean(new_box, axis=2)
-            new_med = np.median(new_box, axis=(0,1), keepdims=True).astype('uint8')
-            self.box.set_data(new_box)
-            self.med.set_data(new_med)
+            _x = np.arange(int(x)-self.window, int(x)+self.window)
+            _x = _x[(0 <= _x) & (_x < self.img.shape[1])]
+            _y = np.arange(int(y)-self.window, int(y)+self.window)
+            _y = _y[(0 <= _y) & (_y < self.img.shape[0])]
+            new_box = np.full((self.window*2, self.window*2, self.img.shape[2]), np.nan, dtype='uint8')
+            new_box[np.ix_(_y-np.min(_y),_x-np.min(_x))] = self.img[np.ix_(_y,_x)]
+            new_box = np.nanmean(new_box, axis=2)
+            new_med = np.nanmedian(new_box, axis=(0,1), keepdims=True).astype('uint8')
+            self.box_show.set_data(new_box)
+            self.med_show.set_data(new_med)
             self.line.figure.canvas.draw()
         
         
@@ -440,14 +543,16 @@ class PointSetter:
             match = (np.array([self.xs, self.ys]).T == np.array([x[ind[0]], y[ind[0]]]).T).T.all(axis=0)
             index = np.where(match)[0]
             if index.size > 0: 
-                window = np.array([int(self.xs[index[0]])-self.side, int(self.xs[index[0]])+self.side, 
-                                   int(self.ys[index[0]])-self.side, int(self.ys[index[0]])+self.side])
-                window[window<0] = 0
-                new_box = self.img[window[2]:window[3], window[0]:window[1]]
-                new_box = np.mean(new_box, axis=2)
-                new_med = np.median(new_box, axis=(0,1), keepdims=True).astype('uint8')
-                self.box.set_data(new_box)
-                self.med.set_data(new_med)
+                _x = np.arange(int(self.xs[index[0]])-self.window, int(self.xs[index[0]])+self.window)
+                _x = _x[(0 <= _x) & (_x < self.img.shape[1])]
+                _y = np.arange(int(self.ys[index[0]])-self.window, int(self.ys[index[0]])+self.window)
+                _y = _y[(0 <= _y) & (_y < self.img.shape[0])]
+                new_box = np.full((self.window*2, self.window*2, self.img.shape[2]), np.nan, dtype='uint8')
+                new_box[np.ix_(_y-np.min(_y),_x-np.min(_x))] = self.img[np.ix_(_y,_x)]
+                new_box = np.nanmean(new_box, axis=2)
+                new_med = np.nanmedian(new_box, axis=(0,1), keepdims=True).astype('uint8')
+                self.box_show.set_data(new_box)
+                self.med_show.set_data(new_med)
             else: return
         if event.mouseevent.button == 3:
             x = list(event.artist.get_xdata())
