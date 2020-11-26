@@ -240,7 +240,6 @@ class DynamicBackgroundEstimation:
             指定ポイントのXY座標を格納したnumpy配列
         """
         target = np.vstack((pointlist.xs, pointlist.ys)).T.astype(np.uint16)
-        
         return(target)
     
     

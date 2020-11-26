@@ -7,13 +7,14 @@ Created on Tue Nov 24 19:47:24 2020
 
 import os
 import tkinter as tk
+import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import func_dynamic_background_estimation as dbe
 
 global img_array, target, window_size
 
 
-def _destroyWindow():
+def root_destroyWindow():
     root.quit()
     root.destroy()
     
@@ -21,7 +22,7 @@ def _destroyWindow():
 root = tk.Tk()
 root.title(u"Dynamic Background Estimation")
 root.withdraw()
-root.protocol('WM_DELETE_WINDOW', _destroyWindow)
+root.protocol('WM_DELETE_WINDOW', root_destroyWindow)
 
 estimate = dbe.DynamicBackgroundEstimation()
 iDir = os.path.abspath(os.path.dirname(__file__))
@@ -48,6 +49,63 @@ def load_image(dbe, pointlist):
     button_load_image['text'] = 'load image'
     
 
+def output_image(dbe, save_path, output, image_type, model):
+    dbe.save_image(save_path, output, image_type)
+    save_model_path = os.path.splitext(save_path)[0]+'_model'+os.path.splitext(save_path)[1]
+    dbe.save_image(save_model_path, model)
+    tk.messagebox.showinfo(title="Finish", message="Finish creating model and saving image")
+
+
+def select_image_type(dbe, save_path, output, model):
+    v = tk.IntVar()
+    v.set(2)
+    dtype = [
+        "16bit, integer",
+        "32bit, integer",
+        "32bit, rational",
+    ]
+    dtype_name = [
+        "uint16",
+        "uint32",
+        "float32",
+    ]
+    img_type = dtype_name[v.get()]
+    
+    def popup_destroyWindow():
+        popup.destroy()
+    
+    popup = tk.Toplevel(root)
+    popup.geometry('200x150')
+    popup.resizable(width=False, height=False)
+    popup.title(u"Select image type")
+    popup.protocol('WM_DELETE_WINDOW', popup_destroyWindow)
+    
+    popup_label = tk.Label(popup, text="select image type")
+    popup_label.pack(anchor="w", fill="both", pady = 2)
+    
+    def show_selected():
+        global img_type
+        img_type = dtype_name[v.get()]
+        
+    def close_window():
+        global img_type
+        img_type = dtype_name[v.get()]
+        popup.destroy()
+        output_image(dbe, save_path, output, img_type, model)
+    
+    for val, dt in enumerate(dtype):
+        tk.Radiobutton(popup, 
+                      text=dt,
+                      variable=v,
+                      command=show_selected,
+                      value=val).pack(anchor="w", fill="both", pady = 2)
+    
+    button_popup = tk.Button(popup, text="OK", command=close_window)
+    button_popup.pack(side="bottom", fill="both", pady = 2)
+
+
+    
+
 def create_and_output_image(dbe, pointlist):
     global img_array, target, window_size
     button_output_image['state'] = tk.DISABLED
@@ -56,12 +114,14 @@ def create_and_output_image(dbe, pointlist):
                                                 initialdir = iDir, title = "Save as", initialfile = "output.fts")
     if save_path != "": 
         target = dbe.postprocess_plot_point(pointlist)
-        model = dbe.estimate_background(img_array, target, window_size)
-        output = dbe.subtract_background(img_array, model)
-        dbe.save_image(save_path, output)
-        save_model_path = os.path.splitext(save_path)[0]+'_model'+os.path.splitext(save_path)[1]
-        dbe.save_image(save_model_path, model)
-        tk.messagebox.showinfo(title="Finish", message="Finish creating model and saving image")
+        if len(target) == 0:
+            tk.messagebox.showerror(title="ERROR", message="ERROR: cannot read point")
+        elif np.all(np.isnan(img_array)):
+            tk.messagebox.showerror(title="ERROR", message="ERROR: cannot read image")
+        else: 
+            model = dbe.estimate_background(img_array, target, window_size)
+            output = dbe.subtract_background(img_array, model)
+            select_image_type(dbe, save_path, output, model)
     button_output_image['state'] = tk.NORMAL
     button_output_image['text'] = 'create model and save image'
 
