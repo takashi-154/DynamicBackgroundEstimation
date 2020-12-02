@@ -8,6 +8,7 @@ Created on Sun Nov 22 20:04:52 2020
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import tifffile as tiff
 import astropy.io.fits as iofits
 from scipy import optimize
@@ -204,19 +205,20 @@ class DynamicBackgroundEstimation:
             
         fig = plt.figure()
         fig.subplots_adjust(hspace=0.6)
+        gs = gridspec.GridSpec(2,3)
         
-        ax1 = fig.add_subplot(3,3,(1,6))
+        ax1 = fig.add_subplot(gs[:,:2])
         ax1.set_title('left-click: add, right-click: remove')
         img_show = ax1.imshow(img_comp)
         point, = ax1.plot(target[...,0].tolist(), target[...,1].tolist(), marker="o", linestyle='None', color="#FFFF00")
         point.set_picker(True)
         point.set_pickradius(10)
         
-        ax2 = fig.add_subplot(3,3,7)
+        ax2 = fig.add_subplot(gs[0,-1])
         ax2.set_title('point window box')
         box_show = ax2.imshow(box_comp_array,interpolation='nearest',vmin=0,vmax=255,cmap='inferno')
         
-        ax3 = fig.add_subplot(3,3,9)
+        ax3 = fig.add_subplot(gs[1,-1])
         ax3.set_title('box median')
         ax3.axis('off')
         med_show = ax3.imshow(np.nanmedian(box_comp_array, axis=(0,1), keepdims=True).astype('uint8'),
@@ -308,24 +310,27 @@ class DynamicBackgroundEstimation:
                     pxxxx*(x*x*x*x) + pxxxy*(x*x*x*y) + pxxyy*(x*x*y*y) + pxyyy*(x*y*y*y) + pyyyy*(y*y*y*y)
                     )
         
-        box = np.empty((box_window*2, box_window*2, img_array.shape[2], len(target)), dtype='float32')
-        for i in range(len(target)):
-            t = target[i]
-            x = np.arange(int(t[0])-box_window, int(t[0])+box_window)
-            x = x[(0 <= x) & (x < img_array.shape[1])]
-            y = np.arange(int(t[1])-box_window, int(t[1])+box_window)
-            y = y[(0 <= y) & (y < img_array.shape[0])]
-            _box = np.full((box_window*2, box_window*2, img_array.shape[2]), np.nan, dtype='float32')
-            _box[np.ix_(y-np.min(y),x-np.min(x))] = img_array[np.ix_(y,x)]
-            box[:,:,:,i] = _box
-        target_median = np.nanmedian(box, axis=(0,1))
-        
-        model = np.empty_like(img_array)
-        for i in range(model.shape[2]):
-            initial = np.array([np.mean(target_median[i,...]), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-            popt, _ = optimize.curve_fit(fit_func, target.T, target_median[i,...], p0=initial)
-            mesh = np.meshgrid(np.linspace(1,img_array.shape[1],img_array.shape[1]),np.linspace(1,img_array.shape[0],img_array.shape[0]))
-            model[...,i] = fit_func(mesh, *popt)
+        if np.all(np.isnan(img_array)):
+            model = None
+        else:
+            box = np.empty((box_window*2, box_window*2, img_array.shape[2], len(target)), dtype='float32')
+            for i in range(len(target)):
+                t = target[i]
+                x = np.arange(int(t[0])-box_window, int(t[0])+box_window)
+                x = x[(0 <= x) & (x < img_array.shape[1])]
+                y = np.arange(int(t[1])-box_window, int(t[1])+box_window)
+                y = y[(0 <= y) & (y < img_array.shape[0])]
+                _box = np.full((box_window*2, box_window*2, img_array.shape[2]), np.nan, dtype='float32')
+                _box[np.ix_(y-np.min(y),x-np.min(x))] = img_array[np.ix_(y,x)]
+                box[:,:,:,i] = _box
+            target_median = np.nanmedian(box, axis=(0,1))
+            
+            model = np.empty_like(img_array)
+            for i in range(model.shape[2]):
+                initial = np.array([np.mean(target_median[i,...]), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                popt, _ = optimize.curve_fit(fit_func, target.T, target_median[i,...], p0=initial)
+                mesh = np.meshgrid(np.linspace(1,img_array.shape[1],img_array.shape[1]),np.linspace(1,img_array.shape[0],img_array.shape[0]))
+                model[...,i] = fit_func(mesh, *popt)
 
         return(model)
     

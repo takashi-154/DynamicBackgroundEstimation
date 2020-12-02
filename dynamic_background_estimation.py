@@ -54,6 +54,8 @@ def output_image(dbe, save_path, output, image_type, model):
     save_model_path = os.path.splitext(save_path)[0]+'_model'+os.path.splitext(save_path)[1]
     dbe.save_image(save_model_path, model)
     tk.messagebox.showinfo(title="Finish", message="Finish creating model and saving image")
+    button_output_image['state'] = tk.NORMAL
+    button_output_image['text'] = 'create model and save image'
 
 
 def select_image_type(dbe, save_path, output, model):
@@ -73,6 +75,8 @@ def select_image_type(dbe, save_path, output, model):
     
     def popup_destroyWindow():
         popup.destroy()
+        button_output_image['state'] = tk.NORMAL
+        button_output_image['text'] = 'create model and save image'
     
     popup = tk.Toplevel(root)
     popup.geometry('200x150')
@@ -104,8 +108,6 @@ def select_image_type(dbe, save_path, output, model):
     button_popup.pack(side="bottom", fill="both", pady = 2)
 
 
-    
-
 def create_and_output_image(dbe, pointlist):
     global img_array, target, window_size
     button_output_image['state'] = tk.DISABLED
@@ -116,14 +118,21 @@ def create_and_output_image(dbe, pointlist):
         target = dbe.postprocess_plot_point(pointlist)
         if len(target) == 0:
             tk.messagebox.showerror(title="ERROR", message="ERROR: cannot read point")
-        elif np.all(np.isnan(img_array)):
-            tk.messagebox.showerror(title="ERROR", message="ERROR: cannot read image")
-        else: 
+            button_output_image['state'] = tk.NORMAL
+            button_output_image['text'] = 'create model and save image'
+        else:
             model = dbe.estimate_background(img_array, target, window_size)
-            output = dbe.subtract_background(img_array, model)
-            select_image_type(dbe, save_path, output, model)
-    button_output_image['state'] = tk.NORMAL
-    button_output_image['text'] = 'create model and save image'
+            if model is None:
+                tk.messagebox.showerror(title="ERROR", message="ERROR: cannot read image")
+                button_output_image['state'] = tk.NORMAL
+                button_output_image['text'] = 'create model and save image'
+            else: 
+                output = dbe.subtract_background(img_array, model)
+                select_image_type(dbe, save_path, output, model)
+    else:
+        button_output_image['state'] = tk.NORMAL
+        button_output_image['text'] = 'create model and save image'
+
 
 def load_point_list(dbe, pointlist):
     global target
