@@ -29,7 +29,7 @@ iDir = os.path.abspath(os.path.dirname(__file__))
 img_array = estimate.initialize_image()
 target = estimate.initialize_list()
 window_size = 20
-fig, point, img_comp, img_show, box_show, med_show, box_window = estimate.prepare_plot_point(img_array, target, window_size)
+fig, point, img_comp, img_show, mouse_show, box_show, med_show, box_window = estimate.prepare_plot_point(img_array, target, window_size)
 
 
 
@@ -169,7 +169,7 @@ def change_window_size(value):
 
 canvas = FigureCanvasTkAgg(fig, master=root)
 canvas.get_tk_widget().pack(side="top", fill="both", expand=True, padx = 5, pady = 5)
-pointlist = dbe.PointSetter(point, img_comp, img_show, box_show, med_show, box_window)
+pointlist = dbe.PointSetter(point, img_comp, img_show, mouse_show, box_show, med_show, box_window)
 
 
 toolbar = tk.Frame(root)

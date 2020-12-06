@@ -187,6 +187,8 @@ class DynamicBackgroundEstimation:
             PointSetterクラス用返り値
         img_show : 
             PointSetterクラス用返り値
+        mouse_show : 
+            PointSetterクラス用返り値
         box_show : 
             PointSetterクラス用返り値
         med_show : 
@@ -205,26 +207,30 @@ class DynamicBackgroundEstimation:
             
         fig = plt.figure()
         fig.subplots_adjust(hspace=0.6)
-        gs = gridspec.GridSpec(2,3)
+        gs = gridspec.GridSpec(3,3)
         
-        ax1 = fig.add_subplot(gs[:,:2])
-        ax1.set_title('left-click: add, right-click: remove')
-        img_show = ax1.imshow(img_comp)
-        point, = ax1.plot(target[...,0].tolist(), target[...,1].tolist(), marker="o", linestyle='None', color="#FFFF00")
+        ax0 = fig.add_subplot(gs[:,:2])
+        ax0.set_title('left-click: add, right-click: remove')
+        img_show = ax0.imshow(img_comp)
+        point, = ax0.plot(target[...,0].tolist(), target[...,1].tolist(), marker="o", linestyle='None', color="#FFFF00")
         point.set_picker(True)
         point.set_pickradius(10)
         
-        ax2 = fig.add_subplot(gs[0,-1])
+        ax1 = fig.add_subplot(gs[0,-1])
+        ax1.set_title('mouse window box')
+        mouse_show = ax1.imshow(box_comp_array,interpolation='nearest',vmin=0,vmax=255,cmap='inferno')
+        
+        ax2 = fig.add_subplot(gs[1,-1])
         ax2.set_title('point window box')
         box_show = ax2.imshow(box_comp_array,interpolation='nearest',vmin=0,vmax=255,cmap='inferno')
         
-        ax3 = fig.add_subplot(gs[1,-1])
+        ax3 = fig.add_subplot(gs[2,-1])
         ax3.set_title('box median')
         ax3.axis('off')
         med_show = ax3.imshow(np.nanmedian(box_comp_array, axis=(0,1), keepdims=True).astype('uint8'),
                               interpolation='nearest',vmin=0,vmax=255,cmap='inferno')
         
-        return(fig, point, img_comp, img_show, box_show, med_show, box_window)
+        return(fig, point, img_comp, img_show, mouse_show, box_show, med_show, box_window)
         
     
     def postprocess_plot_point(self, pointlist):
@@ -394,6 +400,8 @@ class PointSetter:
         画像。
     img_show : 
         matplotlib_画像。
+    mouse_show : 
+        matplotlib_mouse画像。
     box_show : 
         matplotlib_window画像。
     med_show : 
@@ -410,7 +418,7 @@ class PointSetter:
         指定ポイント選択・削除の関数呼び出し
     """
     
-    def __init__(self, line, img, img_show, box_show, med_show, window):
+    def __init__(self, line, img, img_show, mouse_show, box_show, med_show, window):
         """
         
         Parameters
@@ -421,6 +429,8 @@ class PointSetter:
             画像。
         img_show : 
             画像。
+        mouse_show : 
+            mouse画像。
         box_show : 
             window画像。
         med_show : 
@@ -431,6 +441,7 @@ class PointSetter:
         self.line = line
         self.img = img
         self.img_show = img_show
+        self.mouse_show = mouse_show
         self.box_show = box_show
         self.med_show = med_show
         self.window = window
@@ -438,6 +449,7 @@ class PointSetter:
         self.ys = list(line.get_ydata())
         self.cidadd = line.figure.canvas.mpl_connect('button_press_event', self.on_add)
         self.cidhandle = line.figure.canvas.mpl_connect('pick_event', self.on_handle)
+        self.cidmotion = line.figure.canvas.mpl_connect('motion_notify_event', self.on_motion)
 
 
     def set_image(self, img_array):
@@ -453,7 +465,7 @@ class PointSetter:
         self.img = img_comp
         self.img_show.set_data(img_comp)
         self.img_show.set_extent((0, img_comp.shape[1], img_comp.shape[0], 0))
-        new_box = np.full((self.window*2, self.window*2, img_comp.shape[2]), np.nan, dtype='uint8')
+        new_box = np.full((self.window*2, self.window*2, img_comp.shape[2]), 0, dtype='uint8')
         new_box = np.nanmean(new_box, axis=2)
         new_med = np.nanmedian(new_box, axis=(0,1), keepdims=True).astype('uint8')
         self.box_show.set_data(new_box)
@@ -521,9 +533,9 @@ class PointSetter:
             _x = _x[(0 <= _x) & (_x < self.img.shape[1])]
             _y = np.arange(int(y)-self.window, int(y)+self.window)
             _y = _y[(0 <= _y) & (_y < self.img.shape[0])]
-            new_box = np.full((self.window*2, self.window*2, self.img.shape[2]), np.nan, dtype='uint8')
+            new_box = np.full((self.window*2, self.window*2, self.img.shape[2]), np.nan, dtype='float32')
             new_box[np.ix_(_y-np.min(_y),_x-np.min(_x))] = self.img[np.ix_(_y,_x)]
-            new_box = np.nanmean(new_box, axis=2)
+            new_box = np.mean(new_box, axis=2)
             new_med = np.nanmedian(new_box, axis=(0,1), keepdims=True).astype('uint8')
             self.box_show.set_data(new_box)
             self.med_show.set_data(new_med)
@@ -551,9 +563,9 @@ class PointSetter:
                 _x = _x[(0 <= _x) & (_x < self.img.shape[1])]
                 _y = np.arange(int(self.ys[index[0]])-self.window, int(self.ys[index[0]])+self.window)
                 _y = _y[(0 <= _y) & (_y < self.img.shape[0])]
-                new_box = np.full((self.window*2, self.window*2, self.img.shape[2]), np.nan, dtype='uint8')
+                new_box = np.full((self.window*2, self.window*2, self.img.shape[2]), np.nan, dtype='float32')
                 new_box[np.ix_(_y-np.min(_y),_x-np.min(_x))] = self.img[np.ix_(_y,_x)]
-                new_box = np.nanmean(new_box, axis=2)
+                new_box = np.mean(new_box, axis=2)
                 new_med = np.nanmedian(new_box, axis=(0,1), keepdims=True).astype('uint8')
                 self.box_show.set_data(new_box)
                 self.med_show.set_data(new_med)
@@ -571,3 +583,26 @@ class PointSetter:
                 self.line.figure.canvas.draw()
             else: return
             
+            
+    def on_motion(self, event):
+        """
+        拡大鏡を表示。
+    
+        Parameters
+        ----------
+        event : 
+            モーションイベント。
+        """
+        x = event.xdata
+        y = event.ydata
+        if event.inaxes == self.line.axes:
+            _x = np.arange(int(x)-self.window, int(x)+self.window)
+            _x = _x[(0 <= _x) & (_x < self.img.shape[1])]
+            _y = np.arange(int(y)-self.window, int(y)+self.window)
+            _y = _y[(0 <= _y) & (_y < self.img.shape[0])]
+            new_box = np.full((self.window*2, self.window*2, self.img.shape[2]), np.nan, dtype='float32')
+            new_box[np.ix_(_y-np.min(_y),_x-np.min(_x))] = self.img[np.ix_(_y,_x)]
+            new_box = np.mean(new_box, axis=2)
+            self.mouse_show.set_data(new_box)
+            self.line.figure.canvas.draw()
+
