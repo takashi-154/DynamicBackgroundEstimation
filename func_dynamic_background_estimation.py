@@ -181,6 +181,8 @@ class DynamicBackgroundEstimation:
     
         Returns
         -------
+        fig : 
+            
         point : 
             PointSetterクラス用返り値
         img_comp : 
@@ -195,6 +197,14 @@ class DynamicBackgroundEstimation:
             PointSetterクラス用返り値
         box_window : 
             PointSetterクラス用返り値
+        ax0 : 
+            
+        ax1 : 
+            
+        ax2 : 
+            
+        ax3 : 
+            
         """
         img_comp = (img_array/np.max(img_array)*255).astype('uint8')
         if target.size == 0:
@@ -218,7 +228,7 @@ class DynamicBackgroundEstimation:
         
         ax1 = fig.add_subplot(gs[0,-1])
         ax1.set_title('mouse window box')
-        mouse_show = ax1.imshow(box_comp_array,interpolation='nearest',vmin=0,vmax=255,cmap='inferno')
+        mouse_show = ax1.imshow(box_comp_array)
         
         ax2 = fig.add_subplot(gs[1,-1])
         ax2.set_title('point window box')
@@ -230,7 +240,7 @@ class DynamicBackgroundEstimation:
         med_show = ax3.imshow(np.nanmedian(box_comp_array, axis=(0,1), keepdims=True).astype('uint8'),
                               interpolation='nearest',vmin=0,vmax=255,cmap='inferno')
         
-        return(fig, point, img_comp, img_show, mouse_show, box_show, med_show, box_window)
+        return(fig, point, img_comp, img_show, mouse_show, box_show, med_show, box_window, ax0, ax1, ax2, ax3)
         
     
     def postprocess_plot_point(self, pointlist):
@@ -394,6 +404,8 @@ class PointSetter:
 
     Attributes
     ----------
+    fig : 
+        
     line : 
         指定ポイントの配列。
     img : 
@@ -408,6 +420,14 @@ class PointSetter:
         matplotlib_window画像のmedian。
     window : 
         windowサイズ。
+    ax0 : 
+        
+    ax1 : 
+        
+    ax2 : 
+        
+    ax3 : 
+        
     xs : 
         指定ポイントのX軸
     ys : 
@@ -418,11 +438,13 @@ class PointSetter:
         指定ポイント選択・削除の関数呼び出し
     """
     
-    def __init__(self, line, img, img_show, mouse_show, box_show, med_show, window):
+    def __init__(self, fig, line, img, img_show, mouse_show, box_show, med_show, window, ax0, ax1, ax2, ax3):
         """
         
         Parameters
         ----------
+        fig : 
+            
         line : 
             指定ポイントの配列。
         img : 
@@ -437,7 +459,16 @@ class PointSetter:
             window画像のmedian。
         window : 
             windowサイズ。
+        ax0 : 
+            
+        ax1 : 
+            
+        ax2 : 
+            
+        ax3 : 
+            
         """
+        self.fig = fig
         self.line = line
         self.img = img
         self.img_show = img_show
@@ -445,6 +476,10 @@ class PointSetter:
         self.box_show = box_show
         self.med_show = med_show
         self.window = window
+        self.ax0 = ax0
+        self.ax1 = ax1
+        self.ax2 = ax2
+        self.ax3 = ax3
         self.xs = list(line.get_xdata())
         self.ys = list(line.get_ydata())
         self.cidadd = line.figure.canvas.mpl_connect('button_press_event', self.on_add)
@@ -465,12 +500,21 @@ class PointSetter:
         self.img = img_comp
         self.img_show.set_data(img_comp)
         self.img_show.set_extent((0, img_comp.shape[1], img_comp.shape[0], 0))
+        bg = self.fig.canvas.copy_from_bbox(self.ax0.bbox)
+        self.fig.canvas.restore_region(bg)
+        self.ax0.draw_artist(self.img_show)
+        self.fig.canvas.blit(self.ax0.bbox)
         new_box = np.full((self.window*2, self.window*2, img_comp.shape[2]), 0, dtype='uint8')
         new_box = np.nanmean(new_box, axis=2)
         new_med = np.nanmedian(new_box, axis=(0,1), keepdims=True).astype('uint8')
         self.box_show.set_data(new_box)
         self.med_show.set_data(new_med)
-        self.line.figure.canvas.draw()
+        self.ax2.draw_artist(self.ax2.patch)
+        self.ax2.draw_artist(self.box_show)
+        self.ax3.draw_artist(self.ax3.patch)
+        self.ax3.draw_artist(self.med_show)
+        self.fig.canvas.blit(self.ax2.bbox)
+        self.fig.canvas.blit(self.ax3.bbox)
         
 
     def set_target(self, target):
@@ -485,7 +529,10 @@ class PointSetter:
         self.xs = target[...,0].tolist()
         self.ys = target[...,1].tolist()
         self.line.set_data(self.xs, self.ys)
-        self.line.figure.canvas.draw()
+        bg = self.fig.canvas.copy_from_bbox(self.ax0.bbox)
+        self.fig.canvas.restore_region(bg)
+        self.ax0.draw_artist(self.line)
+        self.fig.canvas.blit(self.ax0.bbox)
         
         
     def set_window(self, new_window):
@@ -510,7 +557,12 @@ class PointSetter:
         self.box_show.set_data(new_box)
         self.box_show.set_extent((0, new_box.shape[1], new_box.shape[0], 0))
         self.med_show.set_data(new_med)
-        self.line.figure.canvas.draw()
+        self.ax2.draw_artist(self.ax2.patch)
+        self.ax2.draw_artist(self.box_show)
+        self.ax3.draw_artist(self.ax3.patch)
+        self.ax3.draw_artist(self.med_show)
+        self.fig.canvas.blit(self.ax2.bbox)
+        self.fig.canvas.blit(self.ax3.bbox)
         
 
     def on_add(self, event):
@@ -529,6 +581,10 @@ class PointSetter:
             self.xs.append(x)
             self.ys.append(y)
             self.line.set_data(self.xs, self.ys)
+            bg = self.fig.canvas.copy_from_bbox(self.ax0.bbox)
+            self.fig.canvas.restore_region(bg)
+            self.ax0.draw_artist(self.line)
+            self.fig.canvas.blit(self.ax0.bbox)
             _x = np.arange(int(x)-self.window, int(x)+self.window)
             _x = _x[(0 <= _x) & (_x < self.img.shape[1])]
             _y = np.arange(int(y)-self.window, int(y)+self.window)
@@ -539,7 +595,12 @@ class PointSetter:
             new_med = np.nanmedian(new_box, axis=(0,1), keepdims=True).astype('uint8')
             self.box_show.set_data(new_box)
             self.med_show.set_data(new_med)
-            self.line.figure.canvas.draw()
+            self.ax2.draw_artist(self.ax2.patch)
+            self.ax2.draw_artist(self.box_show)
+            self.ax3.draw_artist(self.ax3.patch)
+            self.ax3.draw_artist(self.med_show)
+            self.fig.canvas.blit(self.ax2.bbox)
+            self.fig.canvas.blit(self.ax3.bbox)
         
         
     def on_handle(self, event):
@@ -569,6 +630,12 @@ class PointSetter:
                 new_med = np.nanmedian(new_box, axis=(0,1), keepdims=True).astype('uint8')
                 self.box_show.set_data(new_box)
                 self.med_show.set_data(new_med)
+                self.ax2.draw_artist(self.ax2.patch)
+                self.ax2.draw_artist(self.box_show)
+                self.ax3.draw_artist(self.ax3.patch)
+                self.ax3.draw_artist(self.med_show)
+                self.fig.canvas.blit(self.ax2.bbox)
+                self.fig.canvas.blit(self.ax3.bbox)
             else: return
         if event.mouseevent.button == 3:
             x = list(event.artist.get_xdata())
@@ -580,7 +647,10 @@ class PointSetter:
                 self.xs.pop(index[0])
                 self.ys.pop(index[0])
                 self.line.set_data(self.xs, self.ys)
-                self.line.figure.canvas.draw()
+                bg = self.fig.canvas.copy_from_bbox(self.ax0.bbox)
+                self.fig.canvas.restore_region(bg)
+                self.ax0.draw_artist(self.line)
+                self.fig.canvas.blit(self.ax0.bbox)
             else: return
             
             
@@ -602,7 +672,8 @@ class PointSetter:
             _y = _y[(0 <= _y) & (_y < self.img.shape[0])]
             new_box = np.full((self.window*2, self.window*2, self.img.shape[2]), np.nan, dtype='float32')
             new_box[np.ix_(_y-np.min(_y),_x-np.min(_x))] = self.img[np.ix_(_y,_x)]
-            new_box = np.mean(new_box, axis=2)
+            new_box = new_box.astype('uint8')
             self.mouse_show.set_data(new_box)
-            self.line.figure.canvas.draw()
-
+            self.ax1.draw_artist(self.ax1.patch)
+            self.ax1.draw_artist(self.mouse_show)
+            self.fig.canvas.blit(self.ax1.bbox)
