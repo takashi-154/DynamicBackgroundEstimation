@@ -213,7 +213,7 @@ class DynamicBackgroundEstimation:
             box_comp_array = img_comp[target[-1,1]-box_window:target[-1,1]+box_window,
                                       target[-1,0]-box_window:target[-1,0]+box_window]
         
-        box_comp_array = np.mean(box_comp_array, axis=2)
+        box_comp_array_mean = np.mean(box_comp_array, axis=2)
             
         fig = plt.figure()
         fig.subplots_adjust(hspace=0.6)
@@ -232,12 +232,12 @@ class DynamicBackgroundEstimation:
         
         ax2 = fig.add_subplot(gs[1,-1])
         ax2.set_title('point window box')
-        box_show = ax2.imshow(box_comp_array,interpolation='nearest',vmin=0,vmax=255,cmap='inferno')
+        box_show = ax2.imshow(box_comp_array_mean,interpolation='nearest',vmin=0,vmax=255,cmap='inferno')
         
         ax3 = fig.add_subplot(gs[2,-1])
         ax3.set_title('box median')
         ax3.axis('off')
-        med_show = ax3.imshow(np.nanmedian(box_comp_array, axis=(0,1), keepdims=True).astype('uint8'),
+        med_show = ax3.imshow(np.nanmedian(box_comp_array_mean, axis=(0,1), keepdims=True).astype('uint8'),
                               interpolation='nearest',vmin=0,vmax=255,cmap='inferno')
         
         return(fig, point, img_comp, img_show, mouse_show, box_show, med_show, box_window, ax0, ax1, ax2, ax3)
