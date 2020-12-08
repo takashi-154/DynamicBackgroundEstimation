@@ -10,7 +10,7 @@ import tkinter as tk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import func_dynamic_background_estimation as dbe
 
-global img_array, target, window_size
+global img_array, target, window_size, img_color, img_scaled
 
 
 def root_destroyWindow():
@@ -28,7 +28,10 @@ iDir = os.path.abspath(os.path.dirname(__file__))
 img_array = estimate.initialize_image()
 target = estimate.initialize_list()
 window_size = 20
-fig, point, img_comp, img_show, mouse_show, box_show, med_show, box_window, ax0, ax1, ax2, ax3 = estimate.prepare_plot_point(img_array, target, window_size)
+img_color = 1
+img_scaled = False
+fig, point, img_comp, img_display, img_show, mouse_show, box_show, med_show, \
+    ax0, ax1, ax2, ax3 = estimate.prepare_plot_point(img_array, target, window_size, img_color, img_scaled)
 
 
 
@@ -164,11 +167,24 @@ def change_window_size(value):
     global window_size
     window_size = int(value)
     pointlist.set_window(window_size)
+    
+    
+def change_img_color():
+    global img_color
+    img_color = int(color_var.get())
+    pointlist.set_img_color(img_color)
+
+
+def change_img_scaled():
+    global img_scaled
+    img_scaled = scaled_check.get()
+    pointlist.set_img_scaled(img_scaled)
 
 
 canvas = FigureCanvasTkAgg(fig, master=root)
 canvas.get_tk_widget().pack(side="top", fill="both", expand=True, padx = 5, pady = 5)
-pointlist = dbe.PointSetter(fig, point, img_comp, img_show, mouse_show, box_show, med_show, box_window, ax0, ax1, ax2, ax3)
+pointlist = dbe.PointSetter(fig, point, img_comp, img_display, img_show, mouse_show, box_show, med_show, 
+                            window_size, img_color, img_scaled, ax0, ax1, ax2, ax3)
 
 
 toolbar = tk.Frame(root)
@@ -185,23 +201,37 @@ slider_scale = tk.Scale(toolbar,
                         orient=tk.HORIZONTAL,
                         command=change_window_size
                         )
-slider_scale.grid(row=0, column=1, columnspan=3, sticky="ew", padx = 5, pady = 5)
+slider_scale.grid(row=0, column=1, columnspan=2, sticky="ew", padx = 5, pady = 5)
+scaled_check = tk.BooleanVar(toolbar, value=False)
+tk.Checkbutton(toolbar, text='normalized', variable=scaled_check, command=change_img_scaled
+               ).grid(row=0, column=3, sticky="ew", padx = 5, pady = 5)
+
+color_var = tk.IntVar(toolbar, value=img_color)
+tk.Radiobutton(toolbar, text='RGB', value=0, variable=color_var, command=change_img_color
+              ).grid(row=1, column=0, sticky="ew", padx = 5, pady = 5)
+tk.Radiobutton(toolbar, text='R', value=1, variable=color_var, command=change_img_color
+              ).grid(row=1, column=1, sticky="ew", padx = 5, pady = 5)
+tk.Radiobutton(toolbar, text='G', value=2, variable=color_var, command=change_img_color
+              ).grid(row=1, column=2, sticky="ew", padx = 5, pady = 5)
+tk.Radiobutton(toolbar, text='B', value=3, variable=color_var, command=change_img_color
+              ).grid(row=1, column=3, sticky="ew", padx = 5, pady = 5)
+
 
 button_load_image = tk.Button(toolbar, text='load image', 
                    command=lambda: load_image(estimate, pointlist))
-button_load_image.grid(row=1, column=0, sticky="ew", padx = 5, pady = 5)
+button_load_image.grid(row=2, column=0, sticky="ew", padx = 5, pady = 5)
 
 button_load_list = tk.Button(toolbar, text='load point list', 
                    command=lambda: load_point_list(estimate, pointlist))
-button_load_list.grid(row=1, column=1, sticky="ew", padx = 5, pady = 5)
+button_load_list.grid(row=2, column=1, sticky="ew", padx = 5, pady = 5)
 
 button_save_list = tk.Button(toolbar, text='save point list', 
                    command=lambda: save_point_list(estimate, pointlist))
-button_save_list.grid(row=1, column=2, sticky="ew", padx = 5, pady = 5)
+button_save_list.grid(row=2, column=2, sticky="ew", padx = 5, pady = 5)
 
 button_output_image = tk.Button(toolbar, text='create model and save image', 
                    command=lambda: create_and_output_image(estimate, pointlist))
-button_output_image.grid(row=1, column=3, sticky="ew", padx = 5, pady = 5)
+button_output_image.grid(row=2, column=3, sticky="ew", padx = 5, pady = 5)
 
 toolbar.pack(side="bottom", fill="none", padx=5, pady=5, expand=False)
 
