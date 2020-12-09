@@ -239,6 +239,7 @@ class DynamicBackgroundEstimation:
         
         ax0 = fig.add_subplot(gs[:,:2])
         ax0.set_title('left-click: add, right-click: remove')
+        ax0.axis('off')
         img_show = ax0.imshow(img_display)
         point, = ax0.plot(target[...,0].tolist(), target[...,1].tolist(), marker="o", linestyle='None', color="#FFFF00")
         point.set_picker(True)
@@ -246,10 +247,12 @@ class DynamicBackgroundEstimation:
         
         ax1 = fig.add_subplot(gs[0,-1])
         ax1.set_title('mouse window box')
+        ax1.axis('off')
         mouse_show = ax1.imshow(box_comp_array)
         
         ax2 = fig.add_subplot(gs[1,-1])
         ax2.set_title('point window box')
+        ax2.axis('off')
         box_show = ax2.imshow(box_comp_array)
         
         ax3 = fig.add_subplot(gs[2,-1])
@@ -544,7 +547,6 @@ class PointSetter:
             pass
         self.img_display = display
         self.img_show.set_data(display)
-        self.img_show.set_extent((0, display.shape[1], display.shape[0], 0))
         bg = self.fig.canvas.copy_from_bbox(self.ax0.bbox)
         self.fig.canvas.restore_region(bg)
         self.ax0.draw_artist(self.img_show)
@@ -600,9 +602,9 @@ class PointSetter:
         new_box = new_box.astype('uint8')
         new_med = np.nanmedian(new_box, axis=(0,1), keepdims=True).astype('uint8')
         self.box_show.set_data(new_box)
-        self.box_show.set_extent((0, new_box.shape[1], new_box.shape[0], 0))
         self.med_show.set_data(new_med)
         self.ax2.draw_artist(self.ax2.patch)
+        self.ax2.draw_artist(self.box_show)
         self.ax2.draw_artist(self.box_show)
         self.ax3.draw_artist(self.ax3.patch)
         self.ax3.draw_artist(self.med_show)
