@@ -54,7 +54,7 @@ def load_image(dbe, pointlist):
 def output_image(dbe, save_path, output, image_type, model):
     dbe.save_image(save_path, output, image_type)
     save_model_path = os.path.splitext(save_path)[0]+'_model'+os.path.splitext(save_path)[1]
-    dbe.save_image(save_model_path, model)
+    dbe.save_image(save_model_path, model, image_type)
     tk.messagebox.showinfo(title="Finish", message="Finish creating model and saving image")
     button_output_image['state'] = tk.NORMAL
     button_output_image['text'] = 'create model and save image'

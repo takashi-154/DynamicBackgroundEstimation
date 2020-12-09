@@ -77,7 +77,7 @@ class DynamicBackgroundEstimation:
         return(img_array)
 
 
-    def save_image(self, name:str, image:np.ndarray, dtype:np.dtype=np.float32):
+    def save_image(self, name:str, image:np.ndarray, dtype:str='float32'):
         """
         numpy配列の画像を指定の形式で保存する。
     
@@ -87,18 +87,28 @@ class DynamicBackgroundEstimation:
             保存先のファイルパス名(TIFF, FITS対応)
         image : np.ndarray
             保存する画像のnumpy配列
-        dtype : np.dtype, default np.float32
+        dtype : str, default 'float32'
             保存形式(デフォルトは[float,32bit])
         """
         path, ext = os.path.splitext(name)
         ext_lower = str.lower(ext)
+        image_cast = image.astype('float32')
+        round_int = lambda x: np.round((x * 2 + 1) // 2)
+        if dtype == 'float32': 
+            pass
+        elif dtype == 'uint32': 
+            image_cast = ((image_cast - np.min(image_cast)) / (np.max(image_cast) - np.min(image_cast))) * np.iinfo(np.uint32).max
+            image_cast = round_int(image_cast).astype(np.uint32)
+        elif dtype == 'uint16': 
+            image_cast = ((image_cast - np.min(image_cast)) / (np.max(image_cast) - np.min(image_cast))) * np.iinfo(np.uint16).max
+            image_cast = round_int(image_cast).astype(np.uint16)
+        else:
+            pass
         if ext_lower in ('.tif', '.tiff'):
             print('saving tif image...')
-            image_cast = image.astype(dtype)
             tiff.imsave(name, image_cast)
         elif ext_lower in ('.fits', '.fts', '.fit'):
             print('saving fits image...')
-            image_cast = image.astype(dtype)
             hdu = iofits.PrimaryHDU(np.rot90(np.fliplr(image_cast), 1).T)
             hdulist = iofits.HDUList([hdu])
             hdulist.writeto(name, overwrite=True)
