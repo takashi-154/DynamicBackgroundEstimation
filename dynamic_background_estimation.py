@@ -28,7 +28,7 @@ iDir = os.path.abspath(os.path.dirname(__file__))
 img_array = estimate.initialize_image()
 target = estimate.initialize_list()
 window_size = 20
-img_color = 1
+img_color = 0
 img_scaled = False
 fig, point, img_comp, img_display, img_show, mouse_show, box_show, med_show, \
     ax0, ax1, ax2, ax3 = estimate.prepare_plot_point(img_array, target, window_size, img_color, img_scaled)
