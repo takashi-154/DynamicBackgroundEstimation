@@ -10,10 +10,10 @@ import tkinter as tk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import func_dynamic_background_estimation as dbe
 
-global img_array, target, window_size
+global img_array, target, window_size, img_color, img_scaled
 
 
-def _destroyWindow():
+def root_destroyWindow():
     root.quit()
     root.destroy()
     
@@ -21,14 +21,17 @@ def _destroyWindow():
 root = tk.Tk()
 root.title(u"Dynamic Background Estimation")
 root.withdraw()
-root.protocol('WM_DELETE_WINDOW', _destroyWindow)
+root.protocol('WM_DELETE_WINDOW', root_destroyWindow)
 
 estimate = dbe.DynamicBackgroundEstimation()
 iDir = os.path.abspath(os.path.dirname(__file__))
 img_array = estimate.initialize_image()
 target = estimate.initialize_list()
 window_size = 20
-fig, point, img_comp, img_show, box_show, med_show, box_window = estimate.prepare_plot_point(img_array, target, window_size)
+img_color = 0
+img_scaled = False
+fig, point, img_comp, img_display, img_show, mouse_show, box_show, med_show, \
+    ax0, ax1, ax2, ax3 = estimate.prepare_plot_point(img_array, target, window_size, img_color, img_scaled)
 
 
 
@@ -48,6 +51,65 @@ def load_image(dbe, pointlist):
     button_load_image['text'] = 'load image'
     
 
+def output_image(dbe, save_path, output, image_type, model):
+    dbe.save_image(save_path, output, image_type)
+    save_model_path = os.path.splitext(save_path)[0]+'_model'+os.path.splitext(save_path)[1]
+    dbe.save_image(save_model_path, model, image_type)
+    tk.messagebox.showinfo(title="Finish", message="Finish creating model and saving image")
+    button_output_image['state'] = tk.NORMAL
+    button_output_image['text'] = 'create model and save image'
+
+
+def select_image_type(dbe, save_path, output, model):
+    v = tk.IntVar()
+    v.set(2)
+    dtype = [
+        "16bit, integer",
+        "32bit, integer",
+        "32bit, rational",
+    ]
+    dtype_name = [
+        "uint16",
+        "uint32",
+        "float32",
+    ]
+    img_type = dtype_name[v.get()]
+    
+    def popup_destroyWindow():
+        popup.destroy()
+        button_output_image['state'] = tk.NORMAL
+        button_output_image['text'] = 'create model and save image'
+    
+    popup = tk.Toplevel(root)
+    popup.geometry('200x150')
+    popup.resizable(width=False, height=False)
+    popup.title(u"Select image type")
+    popup.protocol('WM_DELETE_WINDOW', popup_destroyWindow)
+    
+    popup_label = tk.Label(popup, text="select image type")
+    popup_label.pack(anchor="w", fill="both", pady = 2)
+    
+    def show_selected():
+        global img_type
+        img_type = dtype_name[v.get()]
+        
+    def close_window():
+        global img_type
+        img_type = dtype_name[v.get()]
+        popup.destroy()
+        output_image(dbe, save_path, output, img_type, model)
+    
+    for val, dt in enumerate(dtype):
+        tk.Radiobutton(popup, 
+                      text=dt,
+                      variable=v,
+                      command=show_selected,
+                      value=val).pack(anchor="w", fill="both", pady = 2)
+    
+    button_popup = tk.Button(popup, text="OK", command=close_window)
+    button_popup.pack(side="bottom", fill="both", pady = 2)
+
+
 def create_and_output_image(dbe, pointlist):
     global img_array, target, window_size
     button_output_image['state'] = tk.DISABLED
@@ -56,14 +118,23 @@ def create_and_output_image(dbe, pointlist):
                                                 initialdir = iDir, title = "Save as", initialfile = "output.fts")
     if save_path != "": 
         target = dbe.postprocess_plot_point(pointlist)
-        model = dbe.estimate_background(img_array, target, window_size)
-        output = dbe.subtract_background(img_array, model)
-        dbe.save_image(save_path, output)
-        save_model_path = os.path.splitext(save_path)[0]+'_model'+os.path.splitext(save_path)[1]
-        dbe.save_image(save_model_path, model)
-        tk.messagebox.showinfo(title="Finish", message="Finish creating model and saving image")
-    button_output_image['state'] = tk.NORMAL
-    button_output_image['text'] = 'create model and save image'
+        if len(target) == 0:
+            tk.messagebox.showerror(title="ERROR", message="ERROR: cannot read point")
+            button_output_image['state'] = tk.NORMAL
+            button_output_image['text'] = 'create model and save image'
+        else:
+            model = dbe.estimate_background(img_array, target, window_size)
+            if model is None:
+                tk.messagebox.showerror(title="ERROR", message="ERROR: cannot read image")
+                button_output_image['state'] = tk.NORMAL
+                button_output_image['text'] = 'create model and save image'
+            else: 
+                output = dbe.subtract_background(img_array, model)
+                select_image_type(dbe, save_path, output, model)
+    else:
+        button_output_image['state'] = tk.NORMAL
+        button_output_image['text'] = 'create model and save image'
+
 
 def load_point_list(dbe, pointlist):
     global target
@@ -96,11 +167,24 @@ def change_window_size(value):
     global window_size
     window_size = int(value)
     pointlist.set_window(window_size)
+    
+    
+def change_img_color():
+    global img_color
+    img_color = int(color_var.get())
+    pointlist.set_img_color(img_color)
+
+
+def change_img_scaled():
+    global img_scaled
+    img_scaled = scaled_check.get()
+    pointlist.set_img_scaled(img_scaled)
 
 
 canvas = FigureCanvasTkAgg(fig, master=root)
 canvas.get_tk_widget().pack(side="top", fill="both", expand=True, padx = 5, pady = 5)
-pointlist = dbe.PointSetter(point, img_comp, img_show, box_show, med_show, box_window)
+pointlist = dbe.PointSetter(fig, point, img_comp, img_display, img_show, mouse_show, box_show, med_show, 
+                            window_size, img_color, img_scaled, ax0, ax1, ax2, ax3)
 
 
 toolbar = tk.Frame(root)
@@ -117,23 +201,37 @@ slider_scale = tk.Scale(toolbar,
                         orient=tk.HORIZONTAL,
                         command=change_window_size
                         )
-slider_scale.grid(row=0, column=1, columnspan=3, sticky="ew", padx = 5, pady = 5)
+slider_scale.grid(row=0, column=1, columnspan=2, sticky="ew", padx = 5, pady = 5)
+scaled_check = tk.BooleanVar(toolbar, value=False)
+tk.Checkbutton(toolbar, text='normalized', variable=scaled_check, command=change_img_scaled
+               ).grid(row=0, column=3, sticky="ew", padx = 5, pady = 5)
+
+color_var = tk.IntVar(toolbar, value=img_color)
+tk.Radiobutton(toolbar, text='RGB', value=0, variable=color_var, command=change_img_color
+              ).grid(row=1, column=0, sticky="ew", padx = 5, pady = 5)
+tk.Radiobutton(toolbar, text='R', value=1, variable=color_var, command=change_img_color
+              ).grid(row=1, column=1, sticky="ew", padx = 5, pady = 5)
+tk.Radiobutton(toolbar, text='G', value=2, variable=color_var, command=change_img_color
+              ).grid(row=1, column=2, sticky="ew", padx = 5, pady = 5)
+tk.Radiobutton(toolbar, text='B', value=3, variable=color_var, command=change_img_color
+              ).grid(row=1, column=3, sticky="ew", padx = 5, pady = 5)
+
 
 button_load_image = tk.Button(toolbar, text='load image', 
                    command=lambda: load_image(estimate, pointlist))
-button_load_image.grid(row=1, column=0, sticky="ew", padx = 5, pady = 5)
+button_load_image.grid(row=2, column=0, sticky="ew", padx = 5, pady = 5)
 
 button_load_list = tk.Button(toolbar, text='load point list', 
                    command=lambda: load_point_list(estimate, pointlist))
-button_load_list.grid(row=1, column=1, sticky="ew", padx = 5, pady = 5)
+button_load_list.grid(row=2, column=1, sticky="ew", padx = 5, pady = 5)
 
 button_save_list = tk.Button(toolbar, text='save point list', 
                    command=lambda: save_point_list(estimate, pointlist))
-button_save_list.grid(row=1, column=2, sticky="ew", padx = 5, pady = 5)
+button_save_list.grid(row=2, column=2, sticky="ew", padx = 5, pady = 5)
 
 button_output_image = tk.Button(toolbar, text='create model and save image', 
                    command=lambda: create_and_output_image(estimate, pointlist))
-button_output_image.grid(row=1, column=3, sticky="ew", padx = 5, pady = 5)
+button_output_image.grid(row=2, column=3, sticky="ew", padx = 5, pady = 5)
 
 toolbar.pack(side="bottom", fill="none", padx=5, pady=5, expand=False)
 

@@ -8,6 +8,7 @@ Created on Sun Nov 22 20:04:52 2020
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import tifffile as tiff
 import astropy.io.fits as iofits
 from scipy import optimize
@@ -76,7 +77,7 @@ class DynamicBackgroundEstimation:
         return(img_array)
 
 
-    def save_image(self, name:str, image:np.ndarray, dtype:np.dtype=np.float32):
+    def save_image(self, name:str, image:np.ndarray, dtype:str='float32'):
         """
         numpy配列の画像を指定の形式で保存する。
     
@@ -86,18 +87,28 @@ class DynamicBackgroundEstimation:
             保存先のファイルパス名(TIFF, FITS対応)
         image : np.ndarray
             保存する画像のnumpy配列
-        dtype : np.dtype, default np.float32
+        dtype : str, default 'float32'
             保存形式(デフォルトは[float,32bit])
         """
         path, ext = os.path.splitext(name)
         ext_lower = str.lower(ext)
+        image_cast = image.astype('float32')
+        round_int = lambda x: np.round((x * 2 + 1) // 2)
+        if dtype == 'float32': 
+            pass
+        elif dtype == 'uint32': 
+            image_cast = ((image_cast - np.min(image_cast)) / (np.max(image_cast) - np.min(image_cast))) * np.iinfo(np.uint32).max
+            image_cast = round_int(image_cast).astype(np.uint32)
+        elif dtype == 'uint16': 
+            image_cast = ((image_cast - np.min(image_cast)) / (np.max(image_cast) - np.min(image_cast))) * np.iinfo(np.uint16).max
+            image_cast = round_int(image_cast).astype(np.uint16)
+        else:
+            pass
         if ext_lower in ('.tif', '.tiff'):
             print('saving tif image...')
-            image_cast = image.astype(dtype)
             tiff.imsave(name, image_cast)
         elif ext_lower in ('.fits', '.fts', '.fit'):
             print('saving fits image...')
-            image_cast = image.astype(dtype)
             hdu = iofits.PrimaryHDU(np.rot90(np.fliplr(image_cast), 1).T)
             hdulist = iofits.HDUList([hdu])
             hdulist.writeto(name, overwrite=True)
@@ -165,7 +176,8 @@ class DynamicBackgroundEstimation:
         print('Fin reading list.')
         
 
-    def prepare_plot_point(self, img_array:np.ndarray, target:np.ndarray, box_window:int=20):
+    def prepare_plot_point(self, img_array:np.ndarray, target:np.ndarray, 
+                           box_window:int=20, img_color:int=0, img_scaled:bool=False):
         """
         バックグラウンドを推定する指標となるポイントを打つための初期情報出力。
     
@@ -177,14 +189,24 @@ class DynamicBackgroundEstimation:
             指定ポイントのXY座標を格納したnumpy配列
         box_window : int, default 20
             指定ポイントからのバックグラウンドを推定する面積の範囲（デフォルトは[20]）
+        img_color : int, default 0
+            表示画像の色設定（デフォルトは[0]）
+        img_scaled : bool, default False
+            表示画像のスケーリング（デフォルトは[False]）
     
         Returns
         -------
+        fig : 
+            
         point : 
             PointSetterクラス用返り値
         img_comp : 
             PointSetterクラス用返り値
+        img_display : 
+            PointSetterクラス用返り値
         img_show : 
+            PointSetterクラス用返り値
+        mouse_show : 
             PointSetterクラス用返り値
         box_show : 
             PointSetterクラス用返り値
@@ -192,37 +214,60 @@ class DynamicBackgroundEstimation:
             PointSetterクラス用返り値
         box_window : 
             PointSetterクラス用返り値
+        ax0 : 
+            
+        ax1 : 
+            
+        ax2 : 
+            
+        ax3 : 
+            
         """
         img_comp = (img_array/np.max(img_array)*255).astype('uint8')
-        if target.size == 0:
-            box_comp_array = np.full((box_window*2, box_window*2, img_comp.shape[2]), np.nan, dtype='uint8')
-        else:
-            box_comp_array = img_comp[target[-1,1]-box_window:target[-1,1]+box_window,
-                                      target[-1,0]-box_window:target[-1,0]+box_window]
         
-        box_comp_array = np.mean(box_comp_array, axis=2)
-            
+        img_display = img_comp
+        if img_color == 0:
+            pass
+        elif img_color == 1:
+            img_display[:,:,1] = img_display[:,:,2] = 0
+        elif img_color == 2:
+            img_display[:,:,0] = img_display[:,:,2] = 0
+        elif img_color == 3:
+            img_display[:,:,0] = img_display[:,:,1] = 0
+        else:
+            pass
+        
+        if target.size == 0:
+            box_comp_array = np.full((box_window*2, box_window*2, img_display.shape[2]), np.nan, dtype='uint8')
+        else:
+            box_comp_array = img_display[target[-1,1]-box_window:target[-1,1]+box_window,
+                                         target[-1,0]-box_window:target[-1,0]+box_window]
+        
         fig = plt.figure()
         fig.subplots_adjust(hspace=0.6)
+        gs = gridspec.GridSpec(3,3)
         
-        ax1 = fig.add_subplot(3,3,(1,6))
-        ax1.set_title('left-click: add, right-click: remove')
-        img_show = ax1.imshow(img_comp)
-        point, = ax1.plot(target[...,0].tolist(), target[...,1].tolist(), marker="o", linestyle='None', color="#FFFF00")
+        ax0 = fig.add_subplot(gs[:,:2])
+        ax0.set_title('left-click: add, right-click: remove')
+        img_show = ax0.imshow(img_display)
+        point, = ax0.plot(target[...,0].tolist(), target[...,1].tolist(), marker="o", linestyle='None', color="#FFFF00")
         point.set_picker(True)
         point.set_pickradius(10)
         
-        ax2 = fig.add_subplot(3,3,7)
-        ax2.set_title('point window box')
-        box_show = ax2.imshow(box_comp_array,interpolation='nearest',vmin=0,vmax=255,cmap='inferno')
+        ax1 = fig.add_subplot(gs[0,-1])
+        ax1.set_title('mouse window box')
+        mouse_show = ax1.imshow(box_comp_array)
         
-        ax3 = fig.add_subplot(3,3,9)
+        ax2 = fig.add_subplot(gs[1,-1])
+        ax2.set_title('point window box')
+        box_show = ax2.imshow(box_comp_array)
+        
+        ax3 = fig.add_subplot(gs[2,-1])
         ax3.set_title('box median')
         ax3.axis('off')
-        med_show = ax3.imshow(np.nanmedian(box_comp_array, axis=(0,1), keepdims=True).astype('uint8'),
-                              interpolation='nearest',vmin=0,vmax=255,cmap='inferno')
+        med_show = ax3.imshow(np.nanmedian(box_comp_array, axis=(0,1), keepdims=True).astype('uint8'))
         
-        return(fig, point, img_comp, img_show, box_show, med_show, box_window)
+        return(fig, point, img_comp, img_display, img_show, mouse_show, box_show, med_show, ax0, ax1, ax2, ax3)
         
     
     def postprocess_plot_point(self, pointlist):
@@ -240,7 +285,6 @@ class DynamicBackgroundEstimation:
             指定ポイントのXY座標を格納したnumpy配列
         """
         target = np.vstack((pointlist.xs, pointlist.ys)).T.astype(np.uint16)
-        
         return(target)
     
     
@@ -309,24 +353,27 @@ class DynamicBackgroundEstimation:
                     pxxxx*(x*x*x*x) + pxxxy*(x*x*x*y) + pxxyy*(x*x*y*y) + pxyyy*(x*y*y*y) + pyyyy*(y*y*y*y)
                     )
         
-        box = np.empty((box_window*2, box_window*2, img_array.shape[2], len(target)), dtype='float32')
-        for i in range(len(target)):
-            t = target[i]
-            x = np.arange(int(t[0])-box_window, int(t[0])+box_window)
-            x = x[(0 <= x) & (x < img_array.shape[1])]
-            y = np.arange(int(t[1])-box_window, int(t[1])+box_window)
-            y = y[(0 <= y) & (y < img_array.shape[0])]
-            _box = np.full((box_window*2, box_window*2, img_array.shape[2]), np.nan, dtype='float32')
-            _box[np.ix_(y-np.min(y),x-np.min(x))] = img_array[np.ix_(y,x)]
-            box[:,:,:,i] = _box
-        target_median = np.nanmedian(box, axis=(0,1))
-        
-        model = np.empty_like(img_array)
-        for i in range(model.shape[2]):
-            initial = np.array([np.mean(target_median[i,...]), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-            popt, _ = optimize.curve_fit(fit_func, target.T, target_median[i,...], p0=initial)
-            mesh = np.meshgrid(np.linspace(1,img_array.shape[1],img_array.shape[1]),np.linspace(1,img_array.shape[0],img_array.shape[0]))
-            model[...,i] = fit_func(mesh, *popt)
+        if np.all(np.isnan(img_array)):
+            model = None
+        else:
+            box = np.empty((box_window*2, box_window*2, img_array.shape[2], len(target)), dtype='float32')
+            for i in range(len(target)):
+                t = target[i]
+                x = np.arange(int(t[0])-box_window, int(t[0])+box_window)
+                x = x[(0 <= x) & (x < img_array.shape[1])]
+                y = np.arange(int(t[1])-box_window, int(t[1])+box_window)
+                y = y[(0 <= y) & (y < img_array.shape[0])]
+                _box = np.full((box_window*2, box_window*2, img_array.shape[2]), np.nan, dtype='float32')
+                _box[np.ix_(y-np.min(y),x-np.min(x))] = img_array[np.ix_(y,x)]
+                box[:,:,:,i] = _box
+            target_median = np.nanmedian(box, axis=(0,1))
+            
+            model = np.empty_like(img_array)
+            for i in range(model.shape[2]):
+                initial = np.array([np.mean(target_median[i,...]), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                popt, _ = optimize.curve_fit(fit_func, target.T, target_median[i,...], p0=initial)
+                mesh = np.meshgrid(np.linspace(1,img_array.shape[1],img_array.shape[1]),np.linspace(1,img_array.shape[0],img_array.shape[0]))
+                model[...,i] = fit_func(mesh, *popt)
 
         return(model)
     
@@ -384,18 +431,36 @@ class PointSetter:
 
     Attributes
     ----------
+    fig : 
+        
     line : 
         指定ポイントの配列。
     img : 
         画像。
+    img_display : 
+        表示画像。
     img_show : 
         matplotlib_画像。
+    mouse_show : 
+        matplotlib_mouse画像。
     box_show : 
         matplotlib_window画像。
     med_show : 
         matplotlib_window画像のmedian。
     window : 
         windowサイズ。
+    img_color : 
+        表示画像の色設定。
+    img_scaled : 
+        表示画像のスケーリング。
+    ax0 : 
+        
+    ax1 : 
+        
+    ax2 : 
+        
+    ax3 : 
+        
     xs : 
         指定ポイントのX軸
     ys : 
@@ -406,34 +471,63 @@ class PointSetter:
         指定ポイント選択・削除の関数呼び出し
     """
     
-    def __init__(self, line, img, img_show, box_show, med_show, window):
+    def __init__(self, fig, line, img, img_display, img_show, mouse_show, box_show, med_show, 
+                 window, img_color, img_scaled, ax0, ax1, ax2, ax3):
         """
         
         Parameters
         ----------
+        fig : 
+            
         line : 
             指定ポイントの配列。
         img : 
             画像。
+        img_display : 
+            画像。
         img_show : 
             画像。
+        mouse_show : 
+            mouse画像。
         box_show : 
             window画像。
         med_show : 
             window画像のmedian。
         window : 
             windowサイズ。
+        img_color : 
+            表示画像の色設定。
+        img_scaled : 
+            表示画像のスケーリング。
+        ax0 : 
+            
+        ax1 : 
+            
+        ax2 : 
+            
+        ax3 : 
+            
         """
+        self.fig = fig
         self.line = line
         self.img = img
+        self.img_display = img_display
         self.img_show = img_show
+        self.mouse_show = mouse_show
         self.box_show = box_show
         self.med_show = med_show
         self.window = window
+        self.img_color = img_color
+        self.img_scaled = img_scaled
+        self.ax0 = ax0
+        self.ax1 = ax1
+        self.ax2 = ax2
+        self.ax3 = ax3
         self.xs = list(line.get_xdata())
         self.ys = list(line.get_ydata())
         self.cidadd = line.figure.canvas.mpl_connect('button_press_event', self.on_add)
         self.cidhandle = line.figure.canvas.mpl_connect('pick_event', self.on_handle)
+        self.cidmotion = line.figure.canvas.mpl_connect('motion_notify_event', self.on_motion)
 
 
     def set_image(self, img_array):
@@ -447,14 +541,35 @@ class PointSetter:
         """
         img_comp = (img_array/np.max(img_array)*255).astype('uint8')
         self.img = img_comp
-        self.img_show.set_data(img_comp)
-        self.img_show.set_extent((0, img_comp.shape[1], img_comp.shape[0], 0))
-        new_box = np.full((self.window*2, self.window*2, img_comp.shape[2]), np.nan, dtype='uint8')
-        new_box = np.nanmean(new_box, axis=2)
+        display = self.img.copy()
+        if self.img_color == 0:
+            pass
+        elif self.img_color == 1:
+            display[:,:,1] = display[:,:,2] = 0
+        elif self.img_color == 2:
+            display[:,:,0] = display[:,:,2] = 0
+        elif self.img_color == 3:
+            display[:,:,0] = display[:,:,1] = 0
+        else:
+            pass
+        self.img_display = display
+        self.img_show.set_data(display)
+        self.img_show.set_extent((0, display.shape[1], display.shape[0], 0))
+        bg = self.fig.canvas.copy_from_bbox(self.ax0.bbox)
+        self.fig.canvas.restore_region(bg)
+        self.ax0.draw_artist(self.img_show)
+        self.fig.canvas.blit(self.ax0.bbox)
+        new_box = np.full((self.window*2, self.window*2, display.shape[2]), 0, dtype='uint8')
+        new_box = new_box.astype('uint8')
         new_med = np.nanmedian(new_box, axis=(0,1), keepdims=True).astype('uint8')
         self.box_show.set_data(new_box)
         self.med_show.set_data(new_med)
-        self.line.figure.canvas.draw()
+        self.ax2.draw_artist(self.ax2.patch)
+        self.ax2.draw_artist(self.box_show)
+        self.ax3.draw_artist(self.ax3.patch)
+        self.ax3.draw_artist(self.med_show)
+        self.fig.canvas.blit(self.ax2.bbox)
+        self.fig.canvas.blit(self.ax3.bbox)
         
 
     def set_target(self, target):
@@ -469,7 +584,10 @@ class PointSetter:
         self.xs = target[...,0].tolist()
         self.ys = target[...,1].tolist()
         self.line.set_data(self.xs, self.ys)
-        self.line.figure.canvas.draw()
+        bg = self.fig.canvas.copy_from_bbox(self.ax0.bbox)
+        self.fig.canvas.restore_region(bg)
+        self.ax0.draw_artist(self.line)
+        self.fig.canvas.blit(self.ax0.bbox)
         
         
     def set_window(self, new_window):
@@ -482,19 +600,149 @@ class PointSetter:
             新しいウインドウサイズ
         """
         self.window = new_window
-        new_box = np.full((self.window*2, self.window*2, self.img.shape[2]), np.nan, dtype='uint8')
+        new_box = np.full((self.window*2, self.window*2, self.img_display.shape[2]), np.nan, dtype='uint8')
         if len(self.xs) > 0: 
             _x = np.arange(int(self.xs[-1])-self.window, int(self.xs[-1])+self.window)
-            _x = _x[(0 <= _x) & (_x < self.img.shape[1])]
+            _x = _x[(0 <= _x) & (_x < self.img_display.shape[1])]
             _y = np.arange(int(self.ys[-1])-self.window, int(self.ys[-1])+self.window)
-            _y = _y[(0 <= _y) & (_y < self.img.shape[0])]
-            new_box[np.ix_(_y-np.min(_y),_x-np.min(_x))] = self.img[np.ix_(_y,_x)]
-        new_box = np.nanmean(new_box, axis=2)
+            _y = _y[(0 <= _y) & (_y < self.img_display.shape[0])]
+            new_box[np.ix_(_y-np.min(_y),_x-np.min(_x))] = self.img_display[np.ix_(_y,_x)]
+        new_box = new_box.astype('uint8')
         new_med = np.nanmedian(new_box, axis=(0,1), keepdims=True).astype('uint8')
         self.box_show.set_data(new_box)
         self.box_show.set_extent((0, new_box.shape[1], new_box.shape[0], 0))
         self.med_show.set_data(new_med)
-        self.line.figure.canvas.draw()
+        self.ax2.draw_artist(self.ax2.patch)
+        self.ax2.draw_artist(self.box_show)
+        self.ax2.draw_artist(self.box_show)
+        self.ax3.draw_artist(self.ax3.patch)
+        self.ax3.draw_artist(self.med_show)
+        self.fig.canvas.blit(self.ax2.bbox)
+        self.fig.canvas.blit(self.ax3.bbox)
+        
+        
+    def set_img_scaled(self, new_scaled):
+        """
+        表示画像のスケール変更する。
+    
+        Parameters
+        ----------
+        new_color : int
+            新しい色設定
+        """
+        self.img_scaled = new_scaled
+        display = self.img.copy()
+        if self.img_color == 0:
+            pass
+        elif self.img_color == 1:
+            display[:,:,1] = display[:,:,2] = 0
+        elif self.img_color == 2:
+            display[:,:,0] = display[:,:,2] = 0
+        elif self.img_color == 3:
+            display[:,:,0] = display[:,:,1] = 0
+        else:
+            pass
+        if new_scaled == True:
+            if (np.max(display[:,:,0]) - np.min(display[:,:,0])) > 0:
+                display[:,:,0] = ((display[:,:,0] - np.min(display[:,:,0])) / (np.max(display[:,:,0]) - np.min(display[:,:,0]))) * np.iinfo(np.uint8).max
+            if (np.max(display[:,:,1]) - np.min(display[:,:,1])) > 0:
+                display[:,:,1] = ((display[:,:,1] - np.min(display[:,:,1])) / (np.max(display[:,:,1]) - np.min(display[:,:,1]))) * np.iinfo(np.uint8).max
+            if (np.max(display[:,:,2]) - np.min(display[:,:,2])) > 0:
+                display[:,:,2] = ((display[:,:,2] - np.min(display[:,:,2])) / (np.max(display[:,:,2]) - np.min(display[:,:,2]))) * np.iinfo(np.uint8).max
+        elif new_scaled == False:
+            pass
+        else:
+            pass
+        self.img_display = display
+        self.img_show.set_data(display)
+        bg = self.fig.canvas.copy_from_bbox(self.ax0.bbox)
+        self.fig.canvas.restore_region(bg)
+        self.ax0.draw_artist(self.img_show)
+        self.ax0.draw_artist(self.line)
+        self.fig.canvas.blit(self.ax0.bbox)
+        
+        new_box = np.full((self.window*2, self.window*2, self.img_display.shape[2]), np.nan, dtype='uint8')
+            
+        if len(self.xs) > 0: 
+            _x = np.arange(int(self.xs[-1])-self.window, int(self.xs[-1])+self.window)
+            _x = _x[(0 <= _x) & (_x < self.img_display.shape[1])]
+            _y = np.arange(int(self.ys[-1])-self.window, int(self.ys[-1])+self.window)
+            _y = _y[(0 <= _y) & (_y < self.img_display.shape[0])]
+            new_box[np.ix_(_y-np.min(_y),_x-np.min(_x))] = self.img_display[np.ix_(_y,_x)]
+            
+        new_box = new_box.astype('uint8')
+        new_med = np.nanmedian(new_box, axis=(0,1), keepdims=True).astype('uint8')
+        
+        self.box_show.set_data(new_box)
+        self.med_show.set_data(new_med)
+        bg2 = self.fig.canvas.copy_from_bbox(self.ax2.bbox)
+        bg3 = self.fig.canvas.copy_from_bbox(self.ax3.bbox)
+        self.fig.canvas.restore_region(bg2)
+        self.fig.canvas.restore_region(bg3)
+        self.ax2.draw_artist(self.box_show)
+        self.ax3.draw_artist(self.med_show)
+        self.fig.canvas.blit(self.ax2.bbox)
+        self.fig.canvas.blit(self.ax3.bbox)
+        
+        
+    def set_img_color(self, new_color):
+        """
+        表示画像の色設定を変更する。
+    
+        Parameters
+        ----------
+        new_color : int
+            新しい色設定
+        """
+        self.img_color = new_color
+        display = self.img.copy()
+        if new_color == 0:
+            pass
+        elif new_color == 1:
+            display[:,:,1] = display[:,:,2] = 0
+        elif new_color == 2:
+            display[:,:,0] = display[:,:,2] = 0
+        elif new_color == 3:
+            display[:,:,0] = display[:,:,1] = 0
+        else:
+            pass
+        if self.img_scaled == True:
+            if (np.max(display[:,:,0]) - np.min(display[:,:,0])) > 0:
+                display[:,:,0] = ((display[:,:,0] - np.min(display[:,:,0])) / (np.max(display[:,:,0]) - np.min(display[:,:,0]))) * np.iinfo(np.uint8).max
+            if (np.max(display[:,:,1]) - np.min(display[:,:,1])) > 0:
+                display[:,:,1] = ((display[:,:,1] - np.min(display[:,:,1])) / (np.max(display[:,:,1]) - np.min(display[:,:,1]))) * np.iinfo(np.uint8).max
+            if (np.max(display[:,:,2]) - np.min(display[:,:,2])) > 0:
+                display[:,:,2] = ((display[:,:,2] - np.min(display[:,:,2])) / (np.max(display[:,:,2]) - np.min(display[:,:,2]))) * np.iinfo(np.uint8).max
+        elif self.img_scaled == False:
+            pass
+        else:
+            pass
+        self.img_display = display
+        self.img_show.set_data(display)
+        bg = self.fig.canvas.copy_from_bbox(self.ax0.bbox)
+        self.fig.canvas.restore_region(bg)
+        self.ax0.draw_artist(self.img_show)
+        self.ax0.draw_artist(self.line)
+        self.fig.canvas.blit(self.ax0.bbox)
+        new_box = np.full((self.window*2, self.window*2, self.img_display.shape[2]), np.nan, dtype='uint8')
+        if len(self.xs) > 0: 
+            _x = np.arange(int(self.xs[-1])-self.window, int(self.xs[-1])+self.window)
+            _x = _x[(0 <= _x) & (_x < self.img_display.shape[1])]
+            _y = np.arange(int(self.ys[-1])-self.window, int(self.ys[-1])+self.window)
+            _y = _y[(0 <= _y) & (_y < self.img_display.shape[0])]
+            new_box[np.ix_(_y-np.min(_y),_x-np.min(_x))] = self.img_display[np.ix_(_y,_x)]
+        new_box = new_box.astype('uint8')
+        new_med = np.nanmedian(new_box, axis=(0,1), keepdims=True).astype('uint8')
+        self.box_show.set_data(new_box)
+        self.med_show.set_data(new_med)
+        bg2 = self.fig.canvas.copy_from_bbox(self.ax2.bbox)
+        bg3 = self.fig.canvas.copy_from_bbox(self.ax3.bbox)
+        self.fig.canvas.restore_region(bg2)
+        self.fig.canvas.restore_region(bg3)
+        self.ax2.draw_artist(self.box_show)
+        self.ax3.draw_artist(self.med_show)
+        self.fig.canvas.blit(self.ax2.bbox)
+        self.fig.canvas.blit(self.ax3.bbox)
         
 
     def on_add(self, event):
@@ -513,17 +761,28 @@ class PointSetter:
             self.xs.append(x)
             self.ys.append(y)
             self.line.set_data(self.xs, self.ys)
+            bg = self.fig.canvas.copy_from_bbox(self.ax0.bbox)
+            self.fig.canvas.restore_region(bg)
+            self.ax0.draw_artist(self.line)
+            self.fig.canvas.blit(self.ax0.bbox)
             _x = np.arange(int(x)-self.window, int(x)+self.window)
-            _x = _x[(0 <= _x) & (_x < self.img.shape[1])]
+            _x = _x[(0 <= _x) & (_x < self.img_display.shape[1])]
             _y = np.arange(int(y)-self.window, int(y)+self.window)
-            _y = _y[(0 <= _y) & (_y < self.img.shape[0])]
-            new_box = np.full((self.window*2, self.window*2, self.img.shape[2]), np.nan, dtype='uint8')
-            new_box[np.ix_(_y-np.min(_y),_x-np.min(_x))] = self.img[np.ix_(_y,_x)]
-            new_box = np.nanmean(new_box, axis=2)
+            _y = _y[(0 <= _y) & (_y < self.img_display.shape[0])]
+            new_box = np.full((self.window*2, self.window*2, self.img_display.shape[2]), np.nan, dtype='float32')
+            new_box[np.ix_(_y-np.min(_y),_x-np.min(_x))] = self.img_display[np.ix_(_y,_x)]
+            new_box = new_box.astype('uint8')
             new_med = np.nanmedian(new_box, axis=(0,1), keepdims=True).astype('uint8')
             self.box_show.set_data(new_box)
             self.med_show.set_data(new_med)
-            self.line.figure.canvas.draw()
+            bg2 = self.fig.canvas.copy_from_bbox(self.ax2.bbox)
+            bg3 = self.fig.canvas.copy_from_bbox(self.ax3.bbox)
+            self.fig.canvas.restore_region(bg2)
+            self.fig.canvas.restore_region(bg3)
+            self.ax2.draw_artist(self.box_show)
+            self.ax3.draw_artist(self.med_show)
+            self.fig.canvas.blit(self.ax2.bbox)
+            self.fig.canvas.blit(self.ax3.bbox)
         
         
     def on_handle(self, event):
@@ -544,15 +803,23 @@ class PointSetter:
             index = np.where(match)[0]
             if index.size > 0: 
                 _x = np.arange(int(self.xs[index[0]])-self.window, int(self.xs[index[0]])+self.window)
-                _x = _x[(0 <= _x) & (_x < self.img.shape[1])]
+                _x = _x[(0 <= _x) & (_x < self.img_display.shape[1])]
                 _y = np.arange(int(self.ys[index[0]])-self.window, int(self.ys[index[0]])+self.window)
-                _y = _y[(0 <= _y) & (_y < self.img.shape[0])]
-                new_box = np.full((self.window*2, self.window*2, self.img.shape[2]), np.nan, dtype='uint8')
-                new_box[np.ix_(_y-np.min(_y),_x-np.min(_x))] = self.img[np.ix_(_y,_x)]
-                new_box = np.nanmean(new_box, axis=2)
+                _y = _y[(0 <= _y) & (_y < self.img_display.shape[0])]
+                new_box = np.full((self.window*2, self.window*2, self.img_display.shape[2]), np.nan, dtype='float32')
+                new_box[np.ix_(_y-np.min(_y),_x-np.min(_x))] = self.img_display[np.ix_(_y,_x)]
+                new_box = new_box.astype('uint8')
                 new_med = np.nanmedian(new_box, axis=(0,1), keepdims=True).astype('uint8')
                 self.box_show.set_data(new_box)
                 self.med_show.set_data(new_med)
+                bg2 = self.fig.canvas.copy_from_bbox(self.ax2.bbox)
+                bg3 = self.fig.canvas.copy_from_bbox(self.ax3.bbox)
+                self.fig.canvas.restore_region(bg2)
+                self.fig.canvas.restore_region(bg3)
+                self.ax2.draw_artist(self.box_show)
+                self.ax3.draw_artist(self.med_show)
+                self.fig.canvas.blit(self.ax2.bbox)
+                self.fig.canvas.blit(self.ax3.bbox)
             else: return
         if event.mouseevent.button == 3:
             x = list(event.artist.get_xdata())
@@ -561,9 +828,41 @@ class PointSetter:
             match = (np.array([self.xs, self.ys]).T == np.array([x[ind[0]], y[ind[0]]]).T).T.all(axis=0)
             index = np.where(match)[0]
             if index.size > 0: 
+                print('remove point')
                 self.xs.pop(index[0])
                 self.ys.pop(index[0])
                 self.line.set_data(self.xs, self.ys)
-                self.line.figure.canvas.draw()
+                bg = self.fig.canvas.copy_from_bbox(self.ax0.bbox)
+                self.fig.canvas.restore_region(bg)
+                self.ax0.draw_artist(self.img_show)
+                self.ax0.draw_artist(self.line)
+                self.fig.canvas.blit(self.ax0.bbox)
             else: return
             
+            
+    def on_motion(self, event):
+        """
+        拡大鏡を表示。
+    
+        Parameters
+        ----------
+        event : 
+            モーションイベント。
+        """
+        x = event.xdata
+        y = event.ydata
+        if event.inaxes == self.line.axes:
+            _x = np.arange(int(x)-self.window, int(x)+self.window)
+            _x = _x[(0 <= _x) & (_x < self.img_display.shape[1])]
+            _y = np.arange(int(y)-self.window, int(y)+self.window)
+            _y = _y[(0 <= _y) & (_y < self.img_display.shape[0])]
+            new_box = np.full((self.window*2, self.window*2, self.img_display.shape[2]), np.nan, dtype='float32')
+            new_box[np.ix_(_y-np.min(_y),_x-np.min(_x))] = self.img_display[np.ix_(_y,_x)]
+        else:
+            new_box = np.full((self.window*2, self.window*2, self.img_display.shape[2]), np.nan, dtype='float32')
+        new_box = new_box.astype('uint8')
+        self.mouse_show.set_data(new_box)
+        bg1 = self.fig.canvas.copy_from_bbox(self.ax2.bbox)
+        self.fig.canvas.restore_region(bg1)
+        self.ax1.draw_artist(self.mouse_show)
+        self.fig.canvas.blit(self.ax1.bbox)
