@@ -12,6 +12,7 @@ import matplotlib.gridspec as gridspec
 import tifffile as tiff
 import astropy.io.fits as iofits
 from scipy import optimize
+from skimage import exposure
 
 class DynamicBackgroundEstimation:
     """
@@ -643,12 +644,16 @@ class PointSetter:
         else:
             pass
         if new_scaled == True:
+            display = display.astype(np.float32)
             if (np.max(display[:,:,0]) - np.min(display[:,:,0])) > 0:
-                display[:,:,0] = ((display[:,:,0] - np.min(display[:,:,0])) / (np.max(display[:,:,0]) - np.min(display[:,:,0]))) * np.iinfo(np.uint8).max
+                display[:,:,0] = ((display[:,:,0] - np.min(display[:,:,0])) / (np.max(display[:,:,0]) - np.min(display[:,:,0])))
+                display[:,:,0] = exposure.equalize_hist(display[:,:,0])
             if (np.max(display[:,:,1]) - np.min(display[:,:,1])) > 0:
-                display[:,:,1] = ((display[:,:,1] - np.min(display[:,:,1])) / (np.max(display[:,:,1]) - np.min(display[:,:,1]))) * np.iinfo(np.uint8).max
+                display[:,:,1] = ((display[:,:,1] - np.min(display[:,:,1])) / (np.max(display[:,:,1]) - np.min(display[:,:,1])))
+                display[:,:,1] = exposure.equalize_hist(display[:,:,1])
             if (np.max(display[:,:,2]) - np.min(display[:,:,2])) > 0:
-                display[:,:,2] = ((display[:,:,2] - np.min(display[:,:,2])) / (np.max(display[:,:,2]) - np.min(display[:,:,2]))) * np.iinfo(np.uint8).max
+                display[:,:,2] = ((display[:,:,2] - np.min(display[:,:,2])) / (np.max(display[:,:,2]) - np.min(display[:,:,2])))
+                display[:,:,2] = exposure.equalize_hist(display[:,:,2])
         elif new_scaled == False:
             pass
         else:

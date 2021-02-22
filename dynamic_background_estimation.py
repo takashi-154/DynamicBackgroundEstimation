@@ -203,7 +203,7 @@ slider_scale = tk.Scale(toolbar,
                         )
 slider_scale.grid(row=0, column=1, columnspan=2, sticky="ew", padx = 5, pady = 5)
 scaled_check = tk.BooleanVar(toolbar, value=False)
-tk.Checkbutton(toolbar, text='normalized', variable=scaled_check, command=change_img_scaled
+tk.Checkbutton(toolbar, text='Equalized', variable=scaled_check, command=change_img_scaled
                ).grid(row=0, column=3, sticky="ew", padx = 5, pady = 5)
 
 color_var = tk.IntVar(toolbar, value=img_color)
