@@ -5,7 +5,7 @@
 
 # New!!
 
-（2021/02/24）Version 0.4.0 が公開されました。
+（2021/02/24）Version 0.4.0 が公開されました。[簡単な説明書](https://github.com/takashi-154/DynamicBackgroundExtraction/blob/main/instructions_for_gui.md)も記載しました。
 
 # DEMO
 
@@ -49,7 +49,7 @@ pip install -r requirements.txt
 ~~jupyter notebookで動かすことを基本とします。~~  
 ~~[sample_code.ipynb](https://github.com/takashi-154/DynamicBackgroundExtraction/blob/main/sample_code.ipynb)参照。~~  
 ~~処理したい画像のパスに変更して、上から順に進めていけば、問題なく処理できると思います。~~  
-GUIアプリを作成しました。かなり直感的に操作できます。
+GUIアプリを作成しました。かなり直感的に操作できます。説明書は[こちら](https://github.com/takashi-154/DynamicBackgroundExtraction/blob/main/instructions_for_gui.md)。
 
 # Note
 
