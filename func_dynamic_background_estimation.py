@@ -12,6 +12,7 @@ import matplotlib.gridspec as gridspec
 import tifffile as tiff
 import astropy.io.fits as iofits
 from scipy import optimize
+from skimage import exposure
 
 class DynamicBackgroundEstimation:
     """
@@ -326,7 +327,7 @@ class DynamicBackgroundEstimation:
         plt.show()
     
     
-    def estimate_background(self, img_array:np.ndarray, target:np.ndarray, box_window:int=20):
+    def estimate_background(self, img_array:np.ndarray, target:np.ndarray, box_window:int=20, func_order:int=4):
         """
         指定したポイントの情報を基にバックグラウンドを推定する。
     
@@ -338,20 +339,28 @@ class DynamicBackgroundEstimation:
             指定ポイントのXY座標を格納したnumpy配列
         box_window : int, default 20
             指定ポイントからのバックグラウンドを推定する面積の範囲（デフォルトは[20]）
+        func_order : int, default 4
+            フィッティング関数の次元数（デフォルトは[4]）
             
         Returns
         -------
         model : np.ndarray
             推定されたバックグラウンドのnumpy配列（float,32bit）
         """
-        def fit_func(mesh, p, px, py, pxx, pxy, pyy, pxxx, pxxy, pxyy, pyyy, pxxxx, pxxxy, pxxyy, pxyyy, pyyyy): 
+        def fit_func(mesh, p, *args): 
             x, y = mesh
-            return (p + \
-                    px*x + py*y + \
-                    pxx*(x*x) + pxy*(x*y) + pyy*(y*y) + \
-                    pxxx*(x*x*x) + pxxy*(x*x*y) + pxyy*(x*y*y) + pyyy*(y*y*y) + \
-                    pxxxx*(x*x*x*x) + pxxxy*(x*x*x*y) + pxxyy*(x*x*y*y) + pxyyy*(x*y*y*y) + pyyyy*(y*y*y*y)
-                    )
+            pn = args
+            func = p
+            cum = 0
+            if func_order > 0:
+                for i in range(1, (func_order+1)):
+                    x_array = np.arange(i+1)[::-1].tolist()
+                    y_array = np.arange(i+1).tolist()
+                    for n in range(i+1):
+                        func = func + pn[cum+n]*(x**x_array[n])*(y**y_array[n])
+                    cum = cum + i + 1
+            return func
+        
         
         if np.all(np.isnan(img_array)):
             model = None
@@ -368,9 +377,18 @@ class DynamicBackgroundEstimation:
                 box[:,:,:,i] = _box
             target_median = np.nanmedian(box, axis=(0,1))
             
+            p_array = []
+            if func_order > 0:
+                for i in range(1, (func_order+1)):
+                    _p_array = np.repeat(0, i+1).tolist()
+                    p_array = np.append(p_array, _p_array)
+            
             model = np.empty_like(img_array)
             for i in range(model.shape[2]):
-                initial = np.array([np.mean(target_median[i,...]), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                if func_order == 0:
+                    initial = np.array([np.mean(target_median[i,...])])
+                else:
+                    initial = np.append(np.mean(target_median[i,...]), p_array)
                 popt, _ = optimize.curve_fit(fit_func, target.T, target_median[i,...], p0=initial)
                 mesh = np.meshgrid(np.linspace(1,img_array.shape[1],img_array.shape[1]),np.linspace(1,img_array.shape[0],img_array.shape[0]))
                 model[...,i] = fit_func(mesh, *popt)
@@ -418,9 +436,32 @@ class DynamicBackgroundEstimation:
         Returns
         -------
         output : np.ndarray
-            バックグラウンドを差し引いた画像のnumpy配列（float,32bit）
+            減算した画像のnumpy配列（float,32bit）
         """
         output = img_array - model - np.min(img_array - model)
+        return(output)
+    
+    
+    def divide_background(self, img_array:np.ndarray, model:np.ndarray):
+        """
+        元画像からバックグラウンドを除算する。
+    
+        Parameters
+        ----------
+        img_array : np.ndarray
+            画像のnumpy配列（float,32bit）
+        model : np.ndarray
+            推定されたバックグラウンドのnumpy配列（float,32bit）
+            
+        Returns
+        -------
+        output : np.ndarray
+            除算した画像のnumpy配列（float,32bit）
+        """
+        output = np.zeros(img_array.shape)
+        not_zero = model != 0
+        output[not_zero] = img_array[not_zero] / model[not_zero]
+        output[~not_zero] = 1
         return(output)
 
 
@@ -643,12 +684,17 @@ class PointSetter:
         else:
             pass
         if new_scaled == True:
+            display = display.astype(np.float32)
             if (np.max(display[:,:,0]) - np.min(display[:,:,0])) > 0:
-                display[:,:,0] = ((display[:,:,0] - np.min(display[:,:,0])) / (np.max(display[:,:,0]) - np.min(display[:,:,0]))) * np.iinfo(np.uint8).max
+                display[:,:,0] = ((display[:,:,0] - np.min(display[:,:,0])) / (np.max(display[:,:,0]) - np.min(display[:,:,0])))
+                display[:,:,0] = exposure.equalize_hist(display[:,:,0]) * np.iinfo(np.uint8).max
             if (np.max(display[:,:,1]) - np.min(display[:,:,1])) > 0:
-                display[:,:,1] = ((display[:,:,1] - np.min(display[:,:,1])) / (np.max(display[:,:,1]) - np.min(display[:,:,1]))) * np.iinfo(np.uint8).max
+                display[:,:,1] = ((display[:,:,1] - np.min(display[:,:,1])) / (np.max(display[:,:,1]) - np.min(display[:,:,1])))
+                display[:,:,1] = exposure.equalize_hist(display[:,:,1]) * np.iinfo(np.uint8).max
             if (np.max(display[:,:,2]) - np.min(display[:,:,2])) > 0:
-                display[:,:,2] = ((display[:,:,2] - np.min(display[:,:,2])) / (np.max(display[:,:,2]) - np.min(display[:,:,2]))) * np.iinfo(np.uint8).max
+                display[:,:,2] = ((display[:,:,2] - np.min(display[:,:,2])) / (np.max(display[:,:,2]) - np.min(display[:,:,2])))
+                display[:,:,2] = exposure.equalize_hist(display[:,:,2]) * np.iinfo(np.uint8).max
+            display = display.astype(np.uint8)
         elif new_scaled == False:
             pass
         else:
@@ -707,12 +753,17 @@ class PointSetter:
         else:
             pass
         if self.img_scaled == True:
+            display = display.astype(np.float32)
             if (np.max(display[:,:,0]) - np.min(display[:,:,0])) > 0:
-                display[:,:,0] = ((display[:,:,0] - np.min(display[:,:,0])) / (np.max(display[:,:,0]) - np.min(display[:,:,0]))) * np.iinfo(np.uint8).max
+                display[:,:,0] = ((display[:,:,0] - np.min(display[:,:,0])) / (np.max(display[:,:,0]) - np.min(display[:,:,0])))
+                display[:,:,0] = exposure.equalize_hist(display[:,:,0]) * np.iinfo(np.uint8).max
             if (np.max(display[:,:,1]) - np.min(display[:,:,1])) > 0:
-                display[:,:,1] = ((display[:,:,1] - np.min(display[:,:,1])) / (np.max(display[:,:,1]) - np.min(display[:,:,1]))) * np.iinfo(np.uint8).max
+                display[:,:,1] = ((display[:,:,1] - np.min(display[:,:,1])) / (np.max(display[:,:,1]) - np.min(display[:,:,1])))
+                display[:,:,1] = exposure.equalize_hist(display[:,:,1]) * np.iinfo(np.uint8).max
             if (np.max(display[:,:,2]) - np.min(display[:,:,2])) > 0:
-                display[:,:,2] = ((display[:,:,2] - np.min(display[:,:,2])) / (np.max(display[:,:,2]) - np.min(display[:,:,2]))) * np.iinfo(np.uint8).max
+                display[:,:,2] = ((display[:,:,2] - np.min(display[:,:,2])) / (np.max(display[:,:,2]) - np.min(display[:,:,2])))
+                display[:,:,2] = exposure.equalize_hist(display[:,:,2]) * np.iinfo(np.uint8).max
+            display = display.astype(np.uint8)
         elif self.img_scaled == False:
             pass
         else:
