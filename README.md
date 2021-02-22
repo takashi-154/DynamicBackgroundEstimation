@@ -5,7 +5,7 @@
 
 # New!!
 
-（2021/02/24）Version 0.4.0 が公開されました。[簡単な説明書](https://github.com/takashi-154/DynamicBackgroundExtraction/blob/main/instructions_for_gui.md)も記載しました。
+（2021/02/24）[Version 0.4.0](https://github.com/takashi-154/DynamicBackgroundEstimation/releases) が公開されました。[簡単な説明書](https://github.com/takashi-154/DynamicBackgroundExtraction/blob/main/instructions_for_gui.md)も記載しました。
 
 # DEMO
 
