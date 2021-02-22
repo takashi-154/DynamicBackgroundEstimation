@@ -419,9 +419,32 @@ class DynamicBackgroundEstimation:
         Returns
         -------
         output : np.ndarray
-            バックグラウンドを差し引いた画像のnumpy配列（float,32bit）
+            減算した画像のnumpy配列（float,32bit）
         """
         output = img_array - model - np.min(img_array - model)
+        return(output)
+    
+    
+    def divide_background(self, img_array:np.ndarray, model:np.ndarray):
+        """
+        元画像からバックグラウンドを除算する。
+    
+        Parameters
+        ----------
+        img_array : np.ndarray
+            画像のnumpy配列（float,32bit）
+        model : np.ndarray
+            推定されたバックグラウンドのnumpy配列（float,32bit）
+            
+        Returns
+        -------
+        output : np.ndarray
+            除算した画像のnumpy配列（float,32bit）
+        """
+        output = np.zeros(img_array.shape)
+        not_zero = model != 0
+        output[not_zero] = img_array[not_zero] / model[not_zero]
+        output[~not_zero] = 1
         return(output)
 
 
@@ -647,13 +670,14 @@ class PointSetter:
             display = display.astype(np.float32)
             if (np.max(display[:,:,0]) - np.min(display[:,:,0])) > 0:
                 display[:,:,0] = ((display[:,:,0] - np.min(display[:,:,0])) / (np.max(display[:,:,0]) - np.min(display[:,:,0])))
-                display[:,:,0] = exposure.equalize_hist(display[:,:,0])
+                display[:,:,0] = exposure.equalize_hist(display[:,:,0]) * np.iinfo(np.uint8).max
             if (np.max(display[:,:,1]) - np.min(display[:,:,1])) > 0:
                 display[:,:,1] = ((display[:,:,1] - np.min(display[:,:,1])) / (np.max(display[:,:,1]) - np.min(display[:,:,1])))
-                display[:,:,1] = exposure.equalize_hist(display[:,:,1])
+                display[:,:,1] = exposure.equalize_hist(display[:,:,1]) * np.iinfo(np.uint8).max
             if (np.max(display[:,:,2]) - np.min(display[:,:,2])) > 0:
                 display[:,:,2] = ((display[:,:,2] - np.min(display[:,:,2])) / (np.max(display[:,:,2]) - np.min(display[:,:,2])))
-                display[:,:,2] = exposure.equalize_hist(display[:,:,2])
+                display[:,:,2] = exposure.equalize_hist(display[:,:,2]) * np.iinfo(np.uint8).max
+            display = display.astype(np.uint8)
         elif new_scaled == False:
             pass
         else:
@@ -712,12 +736,17 @@ class PointSetter:
         else:
             pass
         if self.img_scaled == True:
+            display = display.astype(np.float32)
             if (np.max(display[:,:,0]) - np.min(display[:,:,0])) > 0:
-                display[:,:,0] = ((display[:,:,0] - np.min(display[:,:,0])) / (np.max(display[:,:,0]) - np.min(display[:,:,0]))) * np.iinfo(np.uint8).max
+                display[:,:,0] = ((display[:,:,0] - np.min(display[:,:,0])) / (np.max(display[:,:,0]) - np.min(display[:,:,0])))
+                display[:,:,0] = exposure.equalize_hist(display[:,:,0]) * np.iinfo(np.uint8).max
             if (np.max(display[:,:,1]) - np.min(display[:,:,1])) > 0:
-                display[:,:,1] = ((display[:,:,1] - np.min(display[:,:,1])) / (np.max(display[:,:,1]) - np.min(display[:,:,1]))) * np.iinfo(np.uint8).max
+                display[:,:,1] = ((display[:,:,1] - np.min(display[:,:,1])) / (np.max(display[:,:,1]) - np.min(display[:,:,1])))
+                display[:,:,1] = exposure.equalize_hist(display[:,:,1]) * np.iinfo(np.uint8).max
             if (np.max(display[:,:,2]) - np.min(display[:,:,2])) > 0:
-                display[:,:,2] = ((display[:,:,2] - np.min(display[:,:,2])) / (np.max(display[:,:,2]) - np.min(display[:,:,2]))) * np.iinfo(np.uint8).max
+                display[:,:,2] = ((display[:,:,2] - np.min(display[:,:,2])) / (np.max(display[:,:,2]) - np.min(display[:,:,2])))
+                display[:,:,2] = exposure.equalize_hist(display[:,:,2]) * np.iinfo(np.uint8).max
+            display = display.astype(np.uint8)
         elif self.img_scaled == False:
             pass
         else:

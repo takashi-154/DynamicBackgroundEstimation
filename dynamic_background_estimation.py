@@ -29,6 +29,7 @@ img_array = estimate.initialize_image()
 target = estimate.initialize_list()
 window_size = 20
 img_color = 0
+img_method = 0
 img_scaled = False
 fig, point, img_comp, img_display, img_show, mouse_show, box_show, med_show, \
     ax0, ax1, ax2, ax3 = estimate.prepare_plot_point(img_array, target, window_size, img_color, img_scaled)
@@ -111,7 +112,7 @@ def select_image_type(dbe, save_path, output, model):
 
 
 def create_and_output_image(dbe, pointlist):
-    global img_array, target, window_size
+    global img_array, target, window_size, img_method
     button_output_image['state'] = tk.DISABLED
     button_output_image['text'] = 'progress...'
     save_path = tk.filedialog.asksaveasfilename(filetypes = [("image file", ("*.tiff", "*.tif", "*.fts", "*.fit", "*.fits"))], 
@@ -129,7 +130,12 @@ def create_and_output_image(dbe, pointlist):
                 button_output_image['state'] = tk.NORMAL
                 button_output_image['text'] = 'create model and save image'
             else: 
-                output = dbe.subtract_background(img_array, model)
+                if img_method == 0:
+                    output = dbe.subtract_background(img_array, model)
+                elif img_method == 1:
+                    output = dbe.divide_background(img_array, model)
+                else:
+                    output = dbe.subtract_background(img_array, model)
                 select_image_type(dbe, save_path, output, model)
     else:
         button_output_image['state'] = tk.NORMAL
@@ -173,7 +179,12 @@ def change_img_color():
     global img_color
     img_color = int(color_var.get())
     pointlist.set_img_color(img_color)
+    
 
+def change_img_method():
+    global img_method
+    img_method = int(method_var.get())
+    
 
 def change_img_scaled():
     global img_scaled
@@ -216,22 +227,29 @@ tk.Radiobutton(toolbar, text='G', value=2, variable=color_var, command=change_im
 tk.Radiobutton(toolbar, text='B', value=3, variable=color_var, command=change_img_color
               ).grid(row=1, column=3, sticky="ew", padx = 5, pady = 5)
 
+method_label = tk.Label(toolbar, text="method")
+method_label.grid(row=2, column=0, columnspan=1, sticky="ew", padx = 5, pady = 5)
+method_var = tk.IntVar(toolbar, value=img_method)
+tk.Radiobutton(toolbar, text='subtruct', value=0, variable=method_var, command=change_img_method
+              ).grid(row=2, column=1, sticky="ew", padx = 5, pady = 5)
+tk.Radiobutton(toolbar, text='devide', value=1, variable=method_var, command=change_img_method
+              ).grid(row=2, column=2, sticky="ew", padx = 5, pady = 5)
 
 button_load_image = tk.Button(toolbar, text='load image', 
                    command=lambda: load_image(estimate, pointlist))
-button_load_image.grid(row=2, column=0, sticky="ew", padx = 5, pady = 5)
+button_load_image.grid(row=3, column=0, sticky="ew", padx = 5, pady = 5)
 
 button_load_list = tk.Button(toolbar, text='load point list', 
                    command=lambda: load_point_list(estimate, pointlist))
-button_load_list.grid(row=2, column=1, sticky="ew", padx = 5, pady = 5)
+button_load_list.grid(row=3, column=1, sticky="ew", padx = 5, pady = 5)
 
 button_save_list = tk.Button(toolbar, text='save point list', 
                    command=lambda: save_point_list(estimate, pointlist))
-button_save_list.grid(row=2, column=2, sticky="ew", padx = 5, pady = 5)
+button_save_list.grid(row=3, column=2, sticky="ew", padx = 5, pady = 5)
 
 button_output_image = tk.Button(toolbar, text='create model and save image', 
                    command=lambda: create_and_output_image(estimate, pointlist))
-button_output_image.grid(row=2, column=3, sticky="ew", padx = 5, pady = 5)
+button_output_image.grid(row=3, column=3, sticky="ew", padx = 5, pady = 5)
 
 toolbar.pack(side="bottom", fill="none", padx=5, pady=5, expand=False)
 
