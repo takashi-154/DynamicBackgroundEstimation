@@ -237,7 +237,7 @@ tk.Radiobutton(toolbar, text='B', value=3, variable=color_var, command=change_im
 method_label = tk.Label(toolbar, text="method")
 method_label.grid(row=2, column=0, columnspan=1, sticky="ew", padx = 5, pady = 5)
 method_var = tk.IntVar(toolbar, value=img_method)
-tk.Radiobutton(toolbar, text='subtruct', value=0, variable=method_var, command=change_img_method
+tk.Radiobutton(toolbar, text='subtract', value=0, variable=method_var, command=change_img_method
               ).grid(row=2, column=1, sticky="ew", padx = 5, pady = 5)
 tk.Radiobutton(toolbar, text='devide', value=1, variable=method_var, command=change_img_method
               ).grid(row=2, column=2, sticky="ew", padx = 5, pady = 5)
